@@ -3,13 +3,13 @@
 	"id": "psychosis",
 	"version": "${version}",
 	"name": "Psychosis",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Psychosis",
 	"authors": [
-		"Me!"
+		"Sakyrhythm"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/Sakyrhythm/Psychosis"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/psychosis/icon.png",
@@ -20,6 +20,9 @@
 		],
 		"fabric-datagen": [
 			"com.sakyrhythm.psychosis.PsychosisDataGenerator"
+		],
+		"client": [
+			"com.sakyrhythm.psychosis.PsychosisModClient"
 		]
 	},
 	"mixins": [
