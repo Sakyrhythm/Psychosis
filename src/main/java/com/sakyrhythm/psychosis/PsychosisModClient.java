@@ -16,7 +16,8 @@ public class PsychosisModClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         // 注册实体渲染器
-        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER, PlayerModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_STEVE, PlayerModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_SLIM, PlayerModel::getTexturedModelData);
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);
     }
 }
