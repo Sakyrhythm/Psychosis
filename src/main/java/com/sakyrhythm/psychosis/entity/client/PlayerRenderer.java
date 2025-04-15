@@ -15,7 +15,7 @@ public class PlayerRenderer extends MobEntityRenderer<PlayerEntity, FakePlayerMo
 
     @Override
     public Identifier getTexture(PlayerEntity entity) {
-        return TEXTURE;
+        return entity.clientGetters().getTexture();
     }
 
     @Override
