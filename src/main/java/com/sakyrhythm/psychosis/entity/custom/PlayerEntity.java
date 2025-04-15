@@ -26,9 +26,17 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * 自定义玩家实体类，继承自动物实体
+ * 实现具有玩家皮肤显示功能的NPC实体
+ */
 public class PlayerEntity extends AnimalEntity {
 
-    public static final TrackedData<NbtCompound> USE_SKIN = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.NBT_COMPOUND);
+    // 跟踪玩家皮肤数据的NBT标签
+    public static final TrackedData<NbtCompound> USE_SKIN = DataTracker.registerData(
+            PlayerEntity.class,
+            TrackedDataHandlerRegistry.NBT_COMPOUND
+    );
 
     public PlayerEntity(EntityType<? extends AnimalEntity> entityType, World world) {
         super(entityType, world);
@@ -37,107 +45,130 @@ public class PlayerEntity extends AnimalEntity {
     @Override
     public void tick() {
         super.tick();
+        // 可在此处添加每帧更新逻辑
     }
 
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
         super.initDataTracker(builder);
+        // 初始化皮肤数据存储
         builder.add(USE_SKIN, new NbtCompound());
     }
 
     @Override
     protected void initGoals() {
-        this.goalSelector.add(4, new WanderAroundFarGoal(this, 1.0));
-        this.goalSelector.add(5, new LookAtEntityGoal(this, PlayerEntity.class, 6.0f));
-        this.goalSelector.add(6, new LookAroundGoal(this));
+        // 设置AI行为目标
+        this.goalSelector.add(1, new WanderAroundFarGoal(this, 1.0));  // 漫游行为
+        this.goalSelector.add(2, new LookAtEntityGoal(this, PlayerEntity.class, 6.0f));  // 注视玩家
+        this.goalSelector.add(4, new LookAroundGoal(this));  // 环顾四周
     }
 
+    /**
+     * 创建实体属性配置
+     */
     public static DefaultAttributeContainer.Builder createPlayerAttributes() {
         return AnimalEntity.createMobAttributes()
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 20.0)
-                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.1)
+                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.3)
                 .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 1.0)
                 .add(EntityAttributes.GENERIC_ATTACK_SPEED, 4.0);
     }
 
     @Override
     public boolean isBreedingItem(ItemStack stack) {
+        // 禁用繁殖功能
         return false;
     }
 
     @Override
     public @Nullable PassiveEntity createChild(ServerWorld world, PassiveEntity entity) {
+        // 禁用繁殖后代
         return null;
     }
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt) {
-        nbt.put("useSkin",getDataTracker().get(USE_SKIN));
+        // 保存皮肤数据到NBT
+        nbt.put("useSkin", getDataTracker().get(USE_SKIN));
         return super.writeNbt(nbt);
     }
 
     @Override
     public void readNbt(NbtCompound nbt) {
-        getDataTracker().set(USE_SKIN,nbt.getCompound("useSkin"));
+        // 从NBT加载皮肤数据
+        getDataTracker().set(USE_SKIN, nbt.getCompound("useSkin"));
         super.readNbt(nbt);
     }
 
-    //Client
-    /*public static boolean isClient = false;
-
-    Supplier<ClientGetter> clientGetterSupplier = isClient ? () -> {
-        throw new UnsupportedOperationException("Accessor client getter without client");
-    }
-    : new Supplier<>() {
-        final ClientGetter getter = new ClientGetter();
-        @Override
-        public ClientGetter get() {
-            return getter;
-        }
-    };*/
+    // 客户端专用功能区域
     @Environment(EnvType.CLIENT)
-    ClientGetters getter=null;
+    private ClientGetters getter = null;
 
-    public ClientGetters clientGetters(){
-        return getter==null?(getter=new ClientGetters()):getter;
+    /**
+     * 获取客户端数据处理器
+     * 示例召唤命令：
+     * /summon psychosis:player ~ ~ ~ {useSkin:{id:[I;-744927312,2119846582,-1503445732,426072093]}}
+     */
+    @Environment(EnvType.CLIENT)
+    public ClientGetters clientGetters() {
+        return getter == null ? (getter = new ClientGetters()) : getter;
     }
 
-//  /summon psychosis:player ~ ~ ~ {usePlayerSkin:[I;-744927312,2119846582,-1503445732,426072093]}
-//  /summon psychosis:player ~ ~ ~ {useSkin:{id:[I;-744927312,2119846582,-1503445732,426072093]}}
+    /**
+     * 客户端数据获取工具类
+     * 处理皮肤纹理的加载和解析
+     */
     @Environment(EnvType.CLIENT)
     public class ClientGetters {
-        ProfileComponent profile =null;
+        private ProfileComponent profile = null;
 
+        /**
+         * 判断是否为细臂模型
+         */
         public boolean isSlim() {
-            SkinTextures textures=getSkinTextures();
-            return textures!=null && textures.model() == SkinTextures.Model.SLIM;
+            SkinTextures textures = getSkinTextures();
+            return textures != null && textures.model() == SkinTextures.Model.SLIM;
         }
 
+        /**
+         * 获取皮肤纹理标识
+         */
         public Identifier getTexture() {
-            SkinTextures textures=getSkinTextures();
-            return textures==null ? PlayerRenderer.TEXTURE :textures.texture();
+            SkinTextures textures = getSkinTextures();
+            return textures == null ? PlayerRenderer.TEXTURE : textures.texture();
         }
 
+        /**
+         * 获取皮肤纹理数据
+         * 包含异步加载和缓存机制
+         */
         public @Nullable SkinTextures getSkinTextures() {
-//            System.out.println(getDataTracker().get(USE_SKIN));
-            var result=ProfileComponent.CODEC.decode(NbtOps.INSTANCE,getDataTracker().get(USE_SKIN));
-            if(!result.isSuccess()) return null;
-            ProfileComponent trackProfile= result.getOrThrow().getFirst();
+            // 解码NBT中的皮肤数据
+            var result = ProfileComponent.CODEC.decode(NbtOps.INSTANCE, getDataTracker().get(USE_SKIN));
+            if (!result.isSuccess()) return null;
+
+            ProfileComponent trackProfile = result.getOrThrow().getFirst();
+
+            // 初始化或更新缓存
             if (profile == null || !profile.gameProfile().equals(trackProfile.gameProfile())) {
-                profile=trackProfile;
+                profile = trackProfile;
             }
-            if(!profile.isCompleted()){
+
+            // 异步加载完整皮肤数据
+            if (!profile.isCompleted()) {
                 profile.getFuture().thenAcceptAsync(p ->
-                                ProfileComponent.CODEC.encodeStart(NbtOps.INSTANCE, p).ifSuccess(profileNbt->{
-                                    if(profileNbt instanceof NbtCompound compound){
-                                        getDataTracker().set(USE_SKIN,compound);
+                                ProfileComponent.CODEC.encodeStart(NbtOps.INSTANCE, p).ifSuccess(profileNbt -> {
+                                    if (profileNbt instanceof NbtCompound compound) {
+                                        getDataTracker().set(USE_SKIN, compound);
                                     }
-                                })
-                        , SkullBlockEntity.EXECUTOR);
+                                }),
+                        SkullBlockEntity.EXECUTOR
+                );
             }
-            return MinecraftClient.getInstance().getSkinProvider().getSkinTextures(profile.gameProfile());
+
+            // 从Minecraft皮肤系统获取纹理
+            return MinecraftClient.getInstance().getSkinProvider()
+                    .getSkinTextures(profile.gameProfile());
         }
-
     }
-
 }

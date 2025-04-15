@@ -2,7 +2,6 @@ package com.sakyrhythm.psychosis.entity;
 
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
-import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
 import net.minecraft.registry.Registries;
