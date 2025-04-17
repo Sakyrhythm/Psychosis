@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * 自定义玩家实体类，继承自动物实体
- * 实现具有玩家皮肤显示功能的NPC实体
+ * 实现具有玩家皮肤a显示功能的NPC实体
  */
 public class PlayerEntity extends AnimalEntity {
 

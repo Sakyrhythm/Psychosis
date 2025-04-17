@@ -3,26 +3,31 @@ package com.sakyrhythm.psychosis.entity.client;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
 import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.client.util.math.MatrixStack;
 
 /**
  * 自定义玩家实体双模型渲染器
  * 根据皮肤类型动态切换Steve/Slim两种模型进行渲染
  */
-public class FakePlayerModel<T extends PlayerEntity> extends EntityModel<T> {
+public class FakePlayerModel<T extends PlayerEntity> extends BipedEntityModel<T> {
 	// 模型实例容器
 	final PlayerModelCopy<T> steve;  // 经典Steve体型模型
 	final PlayerModelCopy<T> slim;   // 细手臂Slim体型模型
 	boolean isSlim;  // 当前使用的模型标识
+
 
 	/**
 	 * 构造器初始化双模型系统
 	 * @param steve 经典模型部件(宽手臂)
 	 * @param slim  Slim模型部件(细手臂)
 	 */
+
 	public FakePlayerModel(ModelPart steve, ModelPart slim) {
-		this.steve = new PlayerModelCopy<>(steve, false);  // 初始化经典模型
+        super(steve);
+        this.steve = new PlayerModelCopy<>(steve, false);  // 初始化经典模型
 		this.slim = new PlayerModelCopy<>(slim, true);     // 初始化Slim模型
 	}
 
@@ -43,6 +48,7 @@ public class FakePlayerModel<T extends PlayerEntity> extends EntityModel<T> {
 		getModel().child=child;
 		// 将参数传递到当前激活的模型
 		getModel().setAngles(entity, limbAngle, limbDistance, animationProgress, headYaw, headPitch);
+
 	}
 
 	/**
