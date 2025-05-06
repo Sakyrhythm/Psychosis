@@ -13,7 +13,7 @@ public class ModEntities {
             Identifier.of(Psychosis.MOD_ID, "player"),
             EntityType.Builder.create(PlayerEntity::new, SpawnGroup.CREATURE)
                     .disableSaving()
-                    .disableSummon()
+                    //.disableSummon()
                     .dimensions(0.6F, 1.8F)
                     .eyeHeight(1.62F)
                     .vehicleAttachment(net.minecraft.entity.player.PlayerEntity.VEHICLE_ATTACHMENT_POS)

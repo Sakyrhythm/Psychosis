@@ -44,7 +44,7 @@ public class FakePlayerModel<T extends PlayerEntity> extends BipedEntityModel<T>
 	public void setAngles(T entity, float limbAngle, float limbDistance, float animationProgress, float headYaw, float headPitch) {
 		// 从实体获取皮肤模型类型
 		isSlim = entity.clientGetters().isSlim();
-		//呵,长大了!
+		//呵,长大了!	
 		getModel().child=child;
 		// 将参数传递到当前激活的模型
 		getModel().setAngles(entity, limbAngle, limbDistance, animationProgress, headYaw, headPitch);
