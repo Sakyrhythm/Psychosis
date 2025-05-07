@@ -1,5 +1,6 @@
 package com.sakyrhythm.psychosis.entity.custom;
 
+import com.sakyrhythm.psychosis.entity.ai.goal.AllTemptGoal;
 import com.sakyrhythm.psychosis.entity.client.PlayerRenderer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -61,7 +62,7 @@ public class PlayerEntity extends AnimalEntity {
     @Override
     protected void initGoals() {
         // 设置AI行为目标
-        this.goalSelector.add(1, new TemptGoal(this,5D, Ingredient.ofItems(Items.WOODEN_SWORD),false));
+        this.goalSelector.add(1, new AllTemptGoal(this,3D, false));
         this.goalSelector.add(2, new WanderAroundFarGoal(this, 1.0));  // 漫游行为
         this.goalSelector.add(3, new LookAtEntityGoal(this, PlayerEntity.class, 6.0f));  // 注视玩家
         this.goalSelector.add(4, new LookAroundGoal(this));  // 环顾四周
