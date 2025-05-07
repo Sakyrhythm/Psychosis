@@ -11,7 +11,6 @@ import net.minecraft.component.type.ProfileComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ai.goal.LookAroundGoal;
 import net.minecraft.entity.ai.goal.LookAtEntityGoal;
-import net.minecraft.entity.ai.goal.TemptGoal;
 import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -21,10 +20,9 @@ import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.recipe.Ingredient;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
@@ -41,6 +39,8 @@ public class PlayerEntity extends AnimalEntity {
             PlayerEntity.class,
             TrackedDataHandlerRegistry.NBT_COMPOUND
     );
+    private static final double MIN_DISTANCE_SQ = 5;
+    private static final double COOLDOWN_TICKS = 50;
 
     public PlayerEntity(EntityType<? extends AnimalEntity> entityType, World world) {
         super(entityType, world);
@@ -50,8 +50,33 @@ public class PlayerEntity extends AnimalEntity {
     public void tick() {
         super.tick();
         // 可在此处添加每帧更新逻辑
-    }
 
+        // 只在服务器端执行逻辑
+        if (!getWorld().isClient()) {
+            // 获取最近的玩家
+            net.minecraft.entity.player.PlayerEntity closestPlayer = getWorld().getClosestPlayer(
+                    this,
+                    getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE)
+            );
+
+            if (closestPlayer != null && this.age >= COOLDOWN_TICKS) {
+                // 计算与玩家的平方距离
+                double distanceSq = this.squaredDistanceTo(closestPlayer);
+
+                // 如果距离过近则消失
+                if (distanceSq < MIN_DISTANCE_SQ) {
+                    ((ServerWorld) getWorld()).spawnParticles(
+                            ParticleTypes.CLOUD,
+                            getX(), getY() + 0.5, getZ(),
+                            10,
+                            0.3, 0.3, 0.3,
+                            0.1
+                    );
+                    this.remove(RemovalReason.DISCARDED);
+                }
+            }
+        }
+    }
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
         super.initDataTracker(builder);
@@ -62,7 +87,7 @@ public class PlayerEntity extends AnimalEntity {
     @Override
     protected void initGoals() {
         // 设置AI行为目标
-        this.goalSelector.add(1, new AllTemptGoal(this,3D, false));
+        this.goalSelector.add(1, new AllTemptGoal(this,1.3));
         this.goalSelector.add(2, new WanderAroundFarGoal(this, 1.0));  // 漫游行为
         this.goalSelector.add(3, new LookAtEntityGoal(this, PlayerEntity.class, 6.0f));  // 注视玩家
         this.goalSelector.add(4, new LookAroundGoal(this));  // 环顾四周
