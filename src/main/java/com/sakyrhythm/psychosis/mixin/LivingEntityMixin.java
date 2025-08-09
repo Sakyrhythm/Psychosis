@@ -1,6 +1,7 @@
 package com.sakyrhythm.psychosis.mixin;
 
 import com.sakyrhythm.psychosis.Psychosis;
+import com.sakyrhythm.psychosis.interfaces.ILivingEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageType;
@@ -20,7 +21,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args; // New import
 
 @Mixin(LivingEntity.class)
-public abstract class LivingEntityMixin {
+public abstract class LivingEntityMixin implements ILivingEntity {
+    @Unique
+    @Mutable
+    public boolean cbhurt;
 
     @Unique
     @Mutable
@@ -31,7 +35,8 @@ public abstract class LivingEntityMixin {
             at = @At("HEAD")
     )
     private void removeInvincibilityFrames(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        this.timeUntilRegen = 0;
+        if (cbhurt)this.timeUntilRegen = 0;
+        else this.timeUntilRegen = 20;
     }
 
     @ModifyVariable(method = "damage", at = @At("HEAD"), argsOnly = true)

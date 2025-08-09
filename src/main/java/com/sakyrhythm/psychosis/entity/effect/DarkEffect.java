@@ -96,7 +96,7 @@ public class DarkEffect  extends StatusEffect{
             dark = false;
         } else if (amplifier == 31) {
             dark = true;
-        } else if (amplifier > 30 && amplifier < 70) {
+        } else if (amplifier > 30) {
             playerInterface.setDark(50);
         } else if (amplifier == 30) {
             if (entity.getWorld() instanceof ServerWorld serverWorld) {
@@ -112,7 +112,7 @@ public class DarkEffect  extends StatusEffect{
                 playerInterface.setDark(0);
             }
             dark = false;
-        } else if (amplifier < 70 && amplifier != 30) {
+        } else {
             playerInterface.setDark(0);
         }
 
