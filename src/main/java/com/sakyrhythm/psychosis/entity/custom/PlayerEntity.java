@@ -111,7 +111,6 @@ public class PlayerEntity extends AnimalEntity {
                 if (hitsToDeliver > 0) {
                     DamageSource damageSource = new DamageSource(darkDamageEntry);
                     currentDamageTarget.damage(damageSource, 1.0f);
-
                     // --- ADDING THE STATUS EFFECT LOGIC HERE ---
                     // Only attempt to apply the effect if darkEffectEntry was successfully found
                     if (darkEffectEntry != null) {
