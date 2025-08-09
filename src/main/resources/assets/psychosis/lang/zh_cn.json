@@ -1,0 +1,16 @@
+{
+  "block.psychosis.dark_portal_frame": "黑暗框架",
+  "block.psychosis.dark_stone": "浊石",
+  "block.psychosis.dark_dirt": "浊土",
+  "block.psychosis.dark_cobblestone": "裂化浊石",
+  "effect.psychosis.dark": "黑暗纠缠",
+  "effect.psychosis.vulnerable": "易伤",
+  "effect.psychosis.frenzy": "狂暴",
+  "death.attack.dark": "%1$s 被黑暗吞噬了",
+  "death.attack.shadow": "%1$s 被虚无化了",
+  "death.attack.frenzy": "%1$s 已无可救药...",
+  "dark1": "古老的低语正在重铸你的骨骼",
+  "dark2": "淤积的能量撕扯着你的皮囊",
+  "dark3": "约束力场正被侵蚀！",
+  "dark4": "被召唤的阴影正俯身聆听神谕...！"
+}

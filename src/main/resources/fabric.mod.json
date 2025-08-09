@@ -23,6 +23,9 @@
 		],
 		"client": [
 			"com.sakyrhythm.psychosis.PsychosisModClient"
+		],
+		"terrablender": [
+			"com.sakyrhythm.psychosis.world.biome.ModTerraBlenderAPI"
 		]
 	},
 	"mixins": [

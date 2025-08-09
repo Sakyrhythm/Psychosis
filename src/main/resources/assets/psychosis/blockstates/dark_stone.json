@@ -1,0 +1,20 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "psychosis:block/dark_stone"
+      },
+      {
+        "model": "psychosis:block/dark_stone_mirrored"
+      },
+      {
+        "model": "psychosis:block/dark_stone",
+        "y": 180
+      },
+      {
+        "model": "psychosis:block/dark_stone_mirrored",
+        "y": 180
+      }
+    ]
+  }
+}

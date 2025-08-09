@@ -1,0 +1,16 @@
+{
+  "block.psychosis.dark_portal_frame": "Dark Pylon",
+  "block.psychosis.dark_stone": "Fouled Stone",
+  "block.psychosis.dark_dirt": "Blighted Earth",
+  "block.psychosis.dark_cobblestone": "Fissured Fouled Stone",
+  "effect.psychosis.dark": "Dark Entanglement",
+  "effect.psychosis.vulnerable": "Vulnerable",
+  "effect.psychosis.frenzy": "Frenzy",
+  "death.attack.dark": "%1$s was devoured by shadows",
+  "death.attack.shadow": "%1$s was voided",
+  "death.attack.frenzy": "%1$s was beyond salvation...",
+  "dark1": "A deep wrongness settles in your bones...",
+  "dark2": "Your skin crawls with pent-up force",
+  "dark3": "THE CONTAINMENT FIELD IS FAILING!",
+  "dark4": "The summoned shadows hearken only to their god...!"
+}
