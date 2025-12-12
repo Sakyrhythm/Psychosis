@@ -13,30 +13,58 @@ import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArgs; // New import
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args; // New import
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin implements ILivingEntity {
     @Unique
     @Mutable
-    public boolean cbhurt;
+    public boolean cbhurt=false;
+
+    @Override
+    public boolean psychosis_template_1_21$getCBHurt() { return this.cbhurt; }
+
+    @Override
+    public void psychosis_template_1_21$setCBHurt(boolean value) { this.cbhurt = value; }
 
     @Unique
     @Mutable
     public int timeUntilRegen;
 
-    @Inject(
+    @Redirect(
             method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z",
-            at = @At("HEAD")
+            at = @At(
+                    value = "FIELD",
+                    target = "Lnet/minecraft/entity/LivingEntity;timeUntilRegen:I",
+                    opcode = org.objectweb.asm.Opcodes.PUTFIELD,
+                    ordinal = 0
+            )
     )
-    private void removeInvincibilityFrames(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (cbhurt)this.timeUntilRegen = 0;
-        else this.timeUntilRegen = 20;
+    private void modifyDamageCooldownSet(LivingEntity entity, int value) {
+        if (entity instanceof ILivingEntity iLivingEntity) {
+            if (iLivingEntity.psychosis_template_1_21$getCBHurt()) {
+                entity.timeUntilRegen = 0;
+            } else {
+                entity.timeUntilRegen = value;
+            }
+        } else {
+            entity.timeUntilRegen = value;
+        }
+    }
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void onTick(CallbackInfo ci) {
+        LivingEntity player = (LivingEntity) (Object) this;
+        RegistryEntry<StatusEffect> darkEffectEntry = player.getWorld().getRegistryManager()
+                .get(RegistryKeys.STATUS_EFFECT)
+                .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "dark")))
+                .orElse(null);
+
+        if (darkEffectEntry != null && !player.hasStatusEffect(darkEffectEntry)) {
+            ILivingEntity playerInterface = (ILivingEntity) player;
+            playerInterface.psychosis_template_1_21$setCBHurt(false);
+        }
     }
 
     @ModifyVariable(method = "damage", at = @At("HEAD"), argsOnly = true)

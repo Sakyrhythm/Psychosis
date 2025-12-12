@@ -2,6 +2,7 @@ package com.sakyrhythm.psychosis.entity.effect;
 
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
+import com.sakyrhythm.psychosis.interfaces.ILivingEntity;
 import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -26,7 +27,6 @@ public class DarkEffect  extends StatusEffect{
                 StatusEffectCategory.HARMFUL,
                 0x45283C);
     }
-
     @Override
     public boolean canApplyUpdateEffect(int duration, int amplifier) {
         return true;
@@ -66,6 +66,10 @@ public class DarkEffect  extends StatusEffect{
 
     @Override
     public boolean applyUpdateEffect(LivingEntity entity, int amplifier) {
+        if (entity instanceof ILivingEntity iEntity) {
+            iEntity.psychosis_template_1_21$setCBHurt(true); // Enable rapid damage when effect starts
+        }
+        super.onApplied(entity, amplifier);
         if (!(entity instanceof IPlayerEntity playerInterface)) {
             return false;
         }

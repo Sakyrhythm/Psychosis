@@ -8,16 +8,9 @@
   },
   "downfall": 0.8,
   "effects": {
-    "ambient_sound": "minecraft:ambient.cave",
     "fog_color": 985615,
     "foliage_color": 2636328,
     "grass_color": 2636328,
-    "mood_sound": {
-      "block_search_extent": 8,
-      "offset": 2.0,
-      "sound": "minecraft:ambient.basalt_deltas.mood",
-      "tick_delay": 6000
-    },
     "particle": {
       "options": {
         "type": "minecraft:ash"
@@ -154,6 +147,12 @@
         "maxCount": 1,
         "minCount": 1,
         "weight": 30
+      },
+      {
+        "type": "psychosis:degeneratewither",
+        "maxCount": 1,
+        "minCount": 1,
+        "weight": 5
       }
     ],
     "underground_water_creature": [],

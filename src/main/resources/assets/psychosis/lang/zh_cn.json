@@ -1,4 +1,5 @@
 {
+  "item.psychosis.void_essence": "深渊能量",
   "block.psychosis.dark_portal_frame": "黑暗框架",
   "block.psychosis.dark_stone": "浊石",
   "block.psychosis.dark_dirt": "浊土",
@@ -12,5 +13,7 @@
   "dark1": "古老的低语正在重铸你的骨骼",
   "dark2": "淤积的能量撕扯着你的皮囊",
   "dark3": "约束力场正被侵蚀！",
-  "dark4": "被召唤的阴影正俯身聆听神谕...！"
+  "dark4": "被召唤的阴影正俯身聆听神谕...！",
+  "entity.psychosis.degeneratewither": "劣化凋灵",
+  "entity.psychosis.player": "伪人"
 }

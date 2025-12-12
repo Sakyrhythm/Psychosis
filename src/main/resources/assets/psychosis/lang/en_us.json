@@ -1,4 +1,5 @@
 {
+  "item.psychosis.void_essence": "Void Essence",
   "block.psychosis.dark_portal_frame": "Dark Pylon",
   "block.psychosis.dark_stone": "Fouled Stone",
   "block.psychosis.dark_dirt": "Blighted Earth",
@@ -12,5 +13,7 @@
   "dark1": "A deep wrongness settles in your bones...",
   "dark2": "Your skin crawls with pent-up force",
   "dark3": "THE CONTAINMENT FIELD IS FAILING!",
-  "dark4": "The summoned shadows hearken only to their god...!"
+  "dark4": "The summoned shadows hearken only to their god...!",
+  "entity.psychosis.degeneratewither": "Degenerate Wither",
+  "entity.psychosis.player": "Fake Player"
 }

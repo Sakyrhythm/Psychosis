@@ -49,6 +49,7 @@ public class ModBiomes {
         spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(EntityType.SPIDER, 5, 2, 6));
         spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(EntityType.ENDERMAN, 20, 1, 2));
         spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(EntityType.GHAST, 30, 1, 1));
+        spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(ModEntities.DEGENERATEWITHER, 5, 1, 1));
 
         GenerationSettings.LookupBackedBuilder generationSettings = new GenerationSettings.LookupBackedBuilder(
                 context.getRegistryLookup(RegistryKeys.PLACED_FEATURE),
@@ -66,8 +67,8 @@ public class ModBiomes {
                 .grassColor(0x283a28)     // 草地颜色: 更暗的墨绿色/灰绿色，显得不健康
                 .foliageColor(0x283a28);  // 树叶颜色: 与草地相同
 
-        biomeEffects.loopSound(SoundEvents.AMBIENT_CAVE);
-        biomeEffects.moodSound(new BiomeMoodSound(SoundEvents.AMBIENT_BASALT_DELTAS_MOOD, 6000, 8, 2.0));
+        //biomeEffects.loopSound(SoundEvents.AMBIENT_CAVE);
+        //biomeEffects.moodSound(new BiomeMoodSound(SoundEvents.AMBIENT_BASALT_DELTAS_MOOD, 6000, 8, 2.0));
         biomeEffects.particleConfig(new BiomeParticleConfig(ParticleTypes.ASH, 0.005f));
 
         Biome darkBiome = new Biome.Builder()

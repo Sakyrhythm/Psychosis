@@ -3,7 +3,9 @@ package com.sakyrhythm.psychosis.entity.custom;
 
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.ai.goal.AllTemptGoal;
+import com.sakyrhythm.psychosis.entity.ai.goal.DarkGoal;
 import com.sakyrhythm.psychosis.entity.client.PlayerRenderer;
+import com.sakyrhythm.psychosis.item.ModItems;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.block.entity.SkullBlockEntity;
@@ -26,6 +28,7 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.particle.ParticleTypes;
@@ -179,6 +182,19 @@ public class PlayerEntity extends AnimalEntity {
             }
         }
     }
+    @Override
+    public void onDeath(DamageSource source) {
+        super.onDeath(source);
+        if (!this.getWorld().isClient) {
+            int voidCount = this.getRandom().nextInt(2);
+            ItemStack void_essence = new ItemStack(ModItems.VOID_ESSENCE, voidCount);
+            for (int i = 0; i < voidCount; i++)
+                this.dropItem(void_essence.getItem());
+        }
+        //if (!this.getWorld().isClient) {
+        //    this.getWorld().createExplosion(this, this.getX(), this.getEyeY(), this.getZ(), 7.0F, false, ExplosionSourceType.MOB);
+        //}
+    }
 
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
@@ -188,6 +204,7 @@ public class PlayerEntity extends AnimalEntity {
 
     @Override
     protected void initGoals() {
+        this.goalSelector.add(1, new DarkGoal(this, 1.3));
         this.goalSelector.add(1, new AllTemptGoal(this,1.3));
         this.goalSelector.add(2, new WanderAroundFarGoal(this, 1.0));
         this.goalSelector.add(3, new LookAtEntityGoal(this, net.minecraft.entity.player.PlayerEntity.class, 6.0f));

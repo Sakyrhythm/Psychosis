@@ -20,6 +20,8 @@ public class ModItemGroups {
                         entries.add(ModBlocks.DARK_COBBLESTONE);
                         entries.add(ModBlocks.DARK_DIRT);
                         entries.add(ModBlocks.DARK_BLOCK); // Use add for a single block
+                        entries.add(ModItems.VOID_ESSENCE);
+                        entries.add(ModItems.ENDER_EYE);
                     }).build());
 
     public static void registerModItemGroups() {

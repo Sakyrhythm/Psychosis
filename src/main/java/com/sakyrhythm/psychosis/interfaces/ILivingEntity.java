@@ -1,6 +1,7 @@
 package com.sakyrhythm.psychosis.interfaces;
 
 public interface ILivingEntity {
-    boolean cbhurt();
-    int timeUntilRegen();
+    boolean psychosis_template_1_21$getCBHurt();
+
+    void psychosis_template_1_21$setCBHurt(boolean value);
 }
