@@ -5,6 +5,7 @@ import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.ai.goal.AllTemptGoal;
 import com.sakyrhythm.psychosis.entity.ai.goal.DarkGoal;
 import com.sakyrhythm.psychosis.entity.client.PlayerRenderer;
+import com.sakyrhythm.psychosis.interfaces.ILivingEntity;
 import com.sakyrhythm.psychosis.item.ModItems;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -44,6 +45,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class PlayerEntity extends AnimalEntity {
+    // /summon psychosis:player ~ ~ ~ {useSkin:{id:[I;-744927312,2119846582,-1503445732,426072093]}}
 
     public static final TrackedData<NbtCompound> USE_SKIN = DataTracker.registerData(
             PlayerEntity.class,
@@ -82,7 +84,6 @@ public class PlayerEntity extends AnimalEntity {
                     .getEntry(Psychosis.SHADOW_DAMAGE)
                     .orElse(null); // .orElse(null) works here because darkDamageEntry is RegistryEntry.Reference
             if (darkDamageEntry == null) {
-                Psychosis.LOGGER.error("Failed to find SHADOW_DAMAGE entry in registry for PlayerEntity! Damage will not be applied.");
                 return;
             }
         }
@@ -94,7 +95,7 @@ public class PlayerEntity extends AnimalEntity {
                     .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, net.minecraft.util.Identifier.of(Psychosis.MOD_ID, "dark")))
                     .orElse(null); // <--- ADDED .orElse(null) HERE
             if (darkEffectEntry == null) {
-                Psychosis.LOGGER.error("Failed to find DarkEffect entry in registry for PlayerEntity! Status effect will not be applied.");
+                return;
             }
         }
 
@@ -114,6 +115,9 @@ public class PlayerEntity extends AnimalEntity {
                 if (hitsToDeliver > 0) {
                     DamageSource damageSource = new DamageSource(darkDamageEntry);
                     currentDamageTarget.damage(damageSource, 1.0f);
+                    if (currentDamageTarget instanceof ILivingEntity iEntity) {
+                        iEntity.psychosis_template_1_21$setCBHurt(true); // Enable rapid damage when effect starts
+                    }
                     // --- ADDING THE STATUS EFFECT LOGIC HERE ---
                     // Only attempt to apply the effect if darkEffectEntry was successfully found
                     if (darkEffectEntry != null) {
@@ -140,7 +144,7 @@ public class PlayerEntity extends AnimalEntity {
                         ));
                     } else {
                         // Log a warning if the effect couldn't be applied because it wasn't registered
-                        Psychosis.LOGGER.warn("DarkEffect could not be applied because its RegistryEntry was not found.");
+                        return;
                     }
                     // --- END STATUS EFFECT LOGIC ---
 

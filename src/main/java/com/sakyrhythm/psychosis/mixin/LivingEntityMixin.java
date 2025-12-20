@@ -10,15 +10,30 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.Identifier;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args; // New import
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin implements ILivingEntity {
+    @Unique
+    @Nullable
+    private LivingEntity lastAttacker = null;
+
+    @Override
+    public @Nullable LivingEntity psychosis_template_1_21$getLastAttacker() {
+        return this.lastAttacker;
+    }
+
+    @Override
+    public void psychosis_template_1_21$setLastAttacker(@Nullable LivingEntity attacker) {
+        this.lastAttacker = attacker;
+    }
     @Unique
     @Mutable
     public boolean cbhurt=false;
@@ -28,11 +43,39 @@ public abstract class LivingEntityMixin implements ILivingEntity {
 
     @Override
     public void psychosis_template_1_21$setCBHurt(boolean value) { this.cbhurt = value; }
+    @Unique
+    private long psychopomp$lastDarkDamageTime = 0;
+
+    // 2. 实现接口方法：获取时间戳
+    @Override
+    public long psychopomp$getLastDarkDamageTime() {
+        return this.psychopomp$lastDarkDamageTime;
+    }
+
+    // 3. 实现接口方法：设置时间戳
+    @Override
+    public void psychopomp$setLastDarkDamageTime(long ticks) {
+        this.psychopomp$lastDarkDamageTime = ticks;
+    }
 
     @Unique
     @Mutable
     public int timeUntilRegen;
 
+    @Inject(
+            method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/entity/LivingEntity;setAttacker(Lnet/minecraft/entity/LivingEntity;)V",
+                    shift = At.Shift.AFTER
+            )
+    )
+    private void setLastAttacker(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        if (source.getAttacker() instanceof LivingEntity attacker) {
+            // 保存当前的攻击者
+            ((ILivingEntity)this).psychosis_template_1_21$setLastAttacker(attacker);
+        }
+    }
     @Redirect(
             method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z",
             at = @At(
@@ -55,6 +98,8 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     }
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
+        long darktime = psychopomp$getLastDarkDamageTime();
+        psychopomp$setLastDarkDamageTime(darktime-1);
         LivingEntity player = (LivingEntity) (Object) this;
         RegistryEntry<StatusEffect> darkEffectEntry = player.getWorld().getRegistryManager()
                 .get(RegistryKeys.STATUS_EFFECT)
