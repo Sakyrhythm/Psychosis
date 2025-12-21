@@ -1,5 +1,6 @@
 {
   "item.psychosis.void_essence": "Void Essence",
+  "item.psychosis.white_eye": "The WHITE",
   "item.psychosis.dark_eye": "Demon Eye",
   "item.psychosis.noticed_bottle": "The Sealing Jar",
   "block.psychosis.dark_portal_frame": "Dark Pylon",
@@ -19,5 +20,7 @@
   "dark4": "The summoned shadows hearken only to their god...!",
   "entity.psychosis.degeneratewither": "Degenerate Wither",
   "entity.psychosis.player": "Fake Player",
-  "cantfind": "If you gaze long into an abyss, the abyss also gazes into you."
+  "cantfind": "If you gaze long into an abyss, the abyss also gazes into you.",
+  "notice": "Demon",
+  "notice1": "Gaze"
 }

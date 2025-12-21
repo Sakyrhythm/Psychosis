@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "X": {
+      "item": "minecraft:ghast_tear"
+    },
+    "#": {
+      "item": "minecraft:soul_sand"
+    },
+    "Y": {
+      "item": "minecraft:ender_eye"
+    }
+  },
+  "pattern": [
+    "#X#",
+    "XYX",
+    "#X#"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:white_eye"
+  }
+}

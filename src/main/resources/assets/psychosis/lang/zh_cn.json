@@ -1,7 +1,9 @@
 {
   "item.psychosis.void_essence": "深渊能量",
+  "item.psychosis.white_eye": "苍白之眼",
   "item.psychosis.dark_eye": "恶魔之眼",
-  "item.psychosis.noticed_bottle": "封印之瓶",
+  "item.psychosis.noticed_bottle.effect.water": "封印之瓶",
+  "item.psychosis.noticed_bottle.effect.empty": "封印之瓶",
   "block.psychosis.dark_portal_frame": "黑暗框架",
   "block.psychosis.dark_stone": "浊石",
   "block.psychosis.dark_dirt": "浊土",
@@ -19,5 +21,7 @@
   "dark4": "被召唤的阴影正俯身聆听神谕...！",
   "entity.psychosis.degeneratewither": "劣化凋灵",
   "entity.psychosis.player": "伪人",
-  "cantfind": "你还未曾被黑暗凝视哦"
+  "cantfind": "你还未曾被黑暗凝视哦",
+  "notice": "恶魔",
+  "notice1": "凝视"
 }

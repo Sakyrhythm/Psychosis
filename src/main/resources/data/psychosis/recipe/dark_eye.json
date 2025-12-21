@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "#": {
+      "item": "minecraft:end_crystal"
+    },
+    "X": {
+      "item": "minecraft:dragon_breath"
+    },
+    "Y": {
+      "item": "psychosis:white_eye"
+    }
+  },
+  "pattern": [
+    "#X#",
+    "XYX",
+    "#X#"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:dark_eye"
+  }
+}

@@ -23,6 +23,7 @@ public class ModItemGroups {
                         entries.add(ModItems.VOID_ESSENCE);
                         entries.add(ModItems.Dark_EYE);
                         entries.add(ModItems.NoticedBottle);
+                        entries.add(ModItems.White_EYE);
                     }).build());
 
     public static void registerModItemGroups() {

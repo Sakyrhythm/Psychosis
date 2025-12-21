@@ -16,6 +16,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsage;
+import net.minecraft.item.PotionItem;
 import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
@@ -37,7 +38,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.List;
 import java.util.Objects;
 
-public class NoticedBottle extends Item {
+public class NoticedBottle extends PotionItem {
 
     // 静态注册表键：Shadow 伤害
     private static final RegistryKey<DamageType> SHADOW_DAMAGE_KEY = RegistryKey.of(
@@ -160,8 +161,11 @@ public class NoticedBottle extends Item {
     }
 
     // 物品工具提示
+    @Override
     public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
-        super.appendTooltip(stack, context, tooltip, type);
+        // 【关键修改：移除 super.appendTooltip(...)】
+        // 移除这一行：super.appendTooltip(stack, context, tooltip, type);
+        // 这样就阻止了父类 PotionItem 检测到空药水内容并显示“无效果”文本。
 
         // Tooltip 无法获取玩家身上的实时效果，因此只显示默认信息
         int darkEffectAmplifierForTooltip = 0;
@@ -171,15 +175,14 @@ public class NoticedBottle extends Item {
                 .getEntry(DARK_EFFECT_KEY)
                 .orElse(null);
 
+        // 从这里开始，您的代码逻辑将直接添加到 tooltip 中，不会有“无效果”的干扰。
         if (darkEffectEntryForTooltip != null) {
-            // 在工具提示中显示默认/基础等级 (0级)
-            List<StatusEffectInstance> list = List.of(new StatusEffectInstance(darkEffectEntryForTooltip, StatusEffectInstance.INFINITE, darkEffectAmplifierForTooltip, false, false, true));
-            Objects.requireNonNull(tooltip);
-            PotionContentsComponent.buildTooltip(list, tooltip::add, 1.0F, context.getUpdateTickRate());
-
-            // 增加说明文本，表明效果是叠加的
-            tooltip.add(Text.translatable("item." + Psychosis.MOD_ID + ".noticed_bottle.tooltip.upgrade")
-                    .formatted(Formatting.GRAY)); // 假设您在语言文件中定义了此键
+            //List<StatusEffectInstance> list = List.of(new StatusEffectInstance(darkEffectEntryForTooltip, StatusEffectInstance.INFINITE, darkEffectAmplifierForTooltip, false, false, true));
+            //PotionContentsComponent.buildTooltip(list, tooltip::add, 1.0F, context.getUpdateTickRate());
+            tooltip.add(Text.translatable("notice1")
+                    .formatted(Formatting.RED));
+            tooltip.add(Text.translatable("notice")
+                    .formatted(Formatting.GOLD));
         }
     }
 }
