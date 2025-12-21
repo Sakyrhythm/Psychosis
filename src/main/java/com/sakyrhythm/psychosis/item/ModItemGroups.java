@@ -22,6 +22,7 @@ public class ModItemGroups {
                         entries.add(ModBlocks.DARK_BLOCK); // Use add for a single block
                         entries.add(ModItems.VOID_ESSENCE);
                         entries.add(ModItems.Dark_EYE);
+                        entries.add(ModItems.NoticedBottle);
                     }).build());
 
     public static void registerModItemGroups() {

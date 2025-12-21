@@ -9,6 +9,7 @@ import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.VulnerableEffect;
+import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
 import com.sakyrhythm.psychosis.item.ModItems;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
@@ -201,12 +202,13 @@ public class Psychosis implements ModInitializer {
 		});
 
 		// =========================================================================
-		// *** 命令注册 ***
+		// *** 命令注册 (要求权限等级 >= 2) ***
 		// =========================================================================
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(literal("psychosis")
 					.then(literal("test-damage")
+							.requires((source) -> source.hasPermissionLevel(2)) // 要求管理员权限
 							.executes(context -> {
 								ServerCommandSource source = context.getSource();
 								ServerPlayerEntity player = source.getPlayer();
@@ -216,6 +218,8 @@ public class Psychosis implements ModInitializer {
 								}
 								DamageSource damageSource = player.getDamageSources().generic();
 								try {
+									IPlayerEntity playerInterface = (IPlayerEntity) player;
+									playerInterface.setNoticed(true);
 									for (int i = 0; i < 10; i++) {
 										player.damage(damageSource, 1.0f);
 										player.sendMessage(Text.literal("造成伤害 #" + (i + 1)), false);
@@ -229,10 +233,9 @@ public class Psychosis implements ModInitializer {
 								}
 							})
 					)
-					// *** /psychosis locate dark 命令 ***
 					.then(literal("locate")
 							.then(literal("dark")
-									.requires((source) -> source.hasPermissionLevel(2))
+									.requires((source) -> source.hasPermissionLevel(2)) // 要求管理员权限
 									.executes(context -> executeLocateDarkStructure(context.getSource()))
 							)
 					)
@@ -240,19 +243,66 @@ public class Psychosis implements ModInitializer {
 		});
 	}
 
-	// =========================================================================
-	// *** 自定义定位结构体的执行方法 (静默模式，使用静态任务列表) ***
-	// =========================================================================
+	public static void forceAndScheduleUnload(ServerWorld world, BlockPos pos) {
 
-	private int executeLocateDarkStructure(ServerCommandSource source) throws CommandSyntaxException {
-		// 1. 获取 Structure 注册表
-		Registry<Structure> structureRegistry = source.getWorld().getRegistryManager().get(RegistryKeys.STRUCTURE);
+		// 1. 结构定位逻辑 (从 executeLocateDarkStructure 复制)
 
-		// 2. 尝试从注册表中获取指定的结构体 RegistryEntry
+		Registry<Structure> structureRegistry = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
+
+		// 检查结构注册表，如果找不到，则中止并记录错误
 		Optional<RegistryEntry.Reference<Structure>> optionalEntry = structureRegistry.getEntry(DARK_STRUCTURE_KEY);
 
 		if (optionalEntry.isEmpty()) {
-			// 命令失败：抛出异常
+			LOGGER.error("Failed to locate DARK_STRUCTURE: Registry entry is missing.");
+			return; // 无法定位，直接返回
+		}
+
+		RegistryEntry.Reference<Structure> structureReference = optionalEntry.get();
+		RegistryEntryList<Structure> structureList = RegistryEntryList.of(new RegistryEntry[]{structureReference});
+
+		// 使用传入的 pos 作为搜索起点
+		BlockPos currentPos = BlockPos.ofFloored(pos.getX(), pos.getY(), pos.getZ());
+
+		// 执行定位操作 (使用与命令相同的 100 区块半径)
+		Pair<BlockPos, RegistryEntry<Structure>> pair = world.getChunkManager().getChunkGenerator().locateStructure(
+				world,
+				structureList,
+				currentPos,
+				LOCATE_STRUCTURE_RADIUS, // 100 区块半径
+				false
+		);
+
+		if (pair == null) {
+			LOGGER.info("Player was noticed but could not find DARK_STRUCTURE within {} chunks of {}", LOCATE_STRUCTURE_RADIUS, currentPos.toShortString());
+			return; // 未找到结构，直接返回
+		}
+
+		// 2. 强制加载和调度卸载 (从 executeLocateDarkStructure 复制)
+
+		BlockPos resultPos = pair.getFirst(); // 找到的结构位置
+		ChunkPos centerChunk = new ChunkPos(resultPos);
+
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				// 强制加载 3x3 区块
+				world.setChunkForced(centerChunk.x + dx, centerChunk.z + dz, true);
+			}
+		}
+
+		// 3. 调度卸载任务
+		CHUNK_UNLOAD_TASKS.add(new ForcedChunkTask(world, centerChunk));
+
+		LOGGER.info("Player was noticed! Forced 3x3 chunks for DARK_STRUCTURE around: {} (Distance: {} blocks)",
+				resultPos.toShortString(),
+				MathHelper.floor(getHorizontalDistance(currentPos.getX(), currentPos.getZ(), resultPos.getX(), resultPos.getZ())));
+	}
+
+	private int executeLocateDarkStructure(ServerCommandSource source) throws CommandSyntaxException {
+		Registry<Structure> structureRegistry = source.getWorld().getRegistryManager().get(RegistryKeys.STRUCTURE);
+
+		Optional<RegistryEntry.Reference<Structure>> optionalEntry = structureRegistry.getEntry(DARK_STRUCTURE_KEY);
+
+		if (optionalEntry.isEmpty()) {
 			throw DARK_STRUCTURE_NOT_FOUND_EXCEPTION.create(DARK_STRUCTURE_ID.toString());
 		}
 
@@ -263,8 +313,6 @@ public class Psychosis implements ModInitializer {
 		ServerWorld serverWorld = source.getWorld();
 
 		Stopwatch stopwatch = Stopwatch.createStarted(Util.TICKER);
-
-		// 3. 执行原版的结构体定位逻辑
 		Pair<BlockPos, RegistryEntry<Structure>> pair = serverWorld.getChunkManager().getChunkGenerator().locateStructure(
 				serverWorld,
 				structureList,
@@ -277,44 +325,23 @@ public class Psychosis implements ModInitializer {
 		Duration timeTaken = stopwatch.elapsed();
 
 		if (pair == null) {
-			// 命令失败：抛出异常
 			throw DARK_STRUCTURE_NOT_FOUND_EXCEPTION.create(DARK_STRUCTURE_ID.toString());
 		} else {
 			BlockPos resultPos = pair.getFirst();
 			String entryString = DARK_STRUCTURE_ID.toString();
-
-			// =========================================================================
-			// *** 强制加载区块 (Load & Add Task to Static List) ***
-			// =========================================================================
 			ChunkPos centerChunk = new ChunkPos(resultPos);
 
-			// 1. 立即加载 3x3 区块
 			for (int dx = -1; dx <= 1; dx++) {
 				for (int dz = -1; dz <= 1; dz++) {
-					// 强制加载区块
 					serverWorld.setChunkForced(centerChunk.x + dx, centerChunk.z + dz, true);
 				}
 			}
-
-			// 2. 创建任务对象并添加到静态列表。
 			CHUNK_UNLOAD_TASKS.add(new ForcedChunkTask(serverWorld, centerChunk));
-
-			// =========================================================================
-
-			// 4. 计算距离并记录日志 (静默，无聊天消息)
 			int distance = MathHelper.floor(getHorizontalDistance(currentPos.getX(), currentPos.getZ(), resultPos.getX(), resultPos.getZ()));
-
-			// 仅记录到服务器日志
 			LOGGER.info("Locating element " + entryString + " took " + timeTaken.toMillis() + " ms. Forced 3x3 chunks for 1 second around: {}", resultPos.toShortString());
-
-			// 返回命令执行结果（距离）
 			return distance;
 		}
 	}
-
-	/**
-	 * Helper function to calculate the horizontal distance.
-	 */
 	private static float getHorizontalDistance(int x1, int y1, int x2, int y2) {
 		int i = x2 - x1;
 		int j = y2 - y1;
