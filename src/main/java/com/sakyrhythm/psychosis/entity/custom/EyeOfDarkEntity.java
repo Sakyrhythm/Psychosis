@@ -22,6 +22,10 @@ public class EyeOfDarkEntity extends Entity implements FlyingItemEntity {
     private static final TrackedData<ItemStack> ITEM = DataTracker.registerData(EyeOfDarkEntity.class, TrackedDataHandlerRegistry.ITEM_STACK);
     private static final ItemStack DEFAULT_ITEM_STACK = new ItemStack(ModItems.Dark_EYE);
 
+    // 恒定速度值，单位：方块/tick。原版 Eye of Ender 飞行时约为 1.5 ~ 1.8 / 20 = 0.075 ~ 0.09
+    // 我们选择一个略快且恒定的速度，例如 0.15
+    private static final double CONSTANT_SPEED = 0.15;
+
     private double targetX;
     private double targetY;
     private double targetZ;
@@ -73,8 +77,11 @@ public class EyeOfDarkEntity extends Entity implements FlyingItemEntity {
         this.lifespan = 0;
         this.dropsItem = this.random.nextInt(5) > 0;
 
-        // 调整初始推力，略微减速，确保转向平滑
-        this.setVelocity(f * 0.03, 0.4, g * 0.03);
+        // **修改点 1：初始速度**
+        // 设置初始速度指向目标，并使用 CONSTANT_SPEED 的一部分作为初始推动力
+        // 这样实体在 tick() 中能更快地被恒定速度逻辑接管。
+        Vec3d initialDirection = new Vec3d(this.targetX - this.getX(), this.targetY - this.getY(), this.targetZ - this.getZ()).normalize();
+        this.setVelocity(initialDirection.multiply(CONSTANT_SPEED * 0.5)); // 初始推力为恒定速度的一半
     }
 
     public void setVelocityClient(double x, double y, double z) {
@@ -95,31 +102,50 @@ public class EyeOfDarkEntity extends Entity implements FlyingItemEntity {
         double d = this.getX() + vec3d.x;
         double e = this.getY() + vec3d.y;
         double f = this.getZ() + vec3d.z;
-        double g = vec3d.horizontalLength();
 
-        this.setPitch(customUpdateRotation(this.prevPitch, (float)(MathHelper.atan2(vec3d.y, g) * (double)(180F / (float)Math.PI))));
-        this.setYaw(customUpdateRotation(this.prevYaw, (float)(MathHelper.atan2(vec3d.x, vec3d.z) * (double)(180F / (float)Math.PI))));
-
+        // **修改点 2：恒定速度飞行逻辑**
         if (!this.getWorld().isClient) {
-            double h = this.targetX - d;
-            double i = this.targetZ - f;
-            float j = (float)Math.sqrt(h * h + i * i);
-            float k = (float)MathHelper.atan2(i, h);
 
-            // 飞行逻辑调整：使用 0.0035 因子，略快于原版，增强追踪性
-            double l = MathHelper.lerp(0.0035, g, (double)j);
-            double m = vec3d.y;
+            // 计算从实体当前位置到目标位置的方向向量
+            double h = this.targetX - this.getX();
+            double i = this.targetY - this.getY();
+            double j = this.targetZ - this.getZ();
 
-            if (j < 1.0F) {
-                l *= 0.8;
-                m *= 0.8;
+            // 计算与目标的距离的平方
+            double distanceSq = h * h + i * i + j * j;
+
+            if (distanceSq > 0.1) {
+                // 如果距离目标足够远，继续追踪
+
+                // 将方向向量标准化（单位化）
+                Vec3d targetDirection = new Vec3d(h, i, j).normalize();
+
+                // 将方向向量乘以恒定速度
+                Vec3d targetVelocity = targetDirection.multiply(CONSTANT_SPEED);
+
+                // 使用插值平滑地转向目标速度，factor 设为 0.1，可以平滑转向，避免过于生硬。
+                double lerpFactor = 0.1;
+                vec3d = vec3d.lerp(targetVelocity, lerpFactor);
+
+                // 如果接近目标点，可以稍微减速以平滑停止
+                if (distanceSq < 1.0) {
+                    vec3d = vec3d.multiply(Math.sqrt(distanceSq)); // 距离越近，速度越慢
+                }
+
+            } else {
+                // 距离目标非常近，停止移动
+                vec3d = Vec3d.ZERO;
             }
 
-            int n = this.getY() < this.targetY ? 1 : -1;
-            vec3d = new Vec3d(Math.cos((double)k) * l, m + ((double)n - m) * 0.015D, Math.sin((double)k) * l);
             this.setVelocity(vec3d);
         }
 
+        // 更新朝向
+        double g = vec3d.horizontalLength();
+        this.setPitch(customUpdateRotation(this.prevPitch, (float)(MathHelper.atan2(vec3d.y, g) * (double)(180F / (float)Math.PI))));
+        this.setYaw(customUpdateRotation(this.prevYaw, (float)(MathHelper.atan2(vec3d.x, vec3d.z) * (double)(180F / (float)Math.PI))));
+
+        // 粒子效果和生命周期逻辑保持不变
         if (this.isTouchingWater()) {
             for(int p = 0; p < 4; ++p) {
                 this.getWorld().addParticle(ParticleTypes.BUBBLE, d - vec3d.x * 0.25D, e - vec3d.y * 0.25D, f - vec3d.z * 0.25D, vec3d.x, vec3d.y, vec3d.z);
@@ -137,7 +163,7 @@ public class EyeOfDarkEntity extends Entity implements FlyingItemEntity {
             this.setPosition(d, e, f);
             ++this.lifespan;
 
-            // 延长生命周期：从 80 增加到 100 ticks (5秒)
+            // 生命周期判断
             if (this.lifespan > 100) {
                 this.playSound(SoundEvents.ENTITY_ENDER_EYE_DEATH, 1.0F, 1.0F);
                 this.discard();

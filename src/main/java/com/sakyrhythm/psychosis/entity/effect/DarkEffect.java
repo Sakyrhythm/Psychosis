@@ -92,7 +92,7 @@ public class DarkEffect extends StatusEffect {
             // ... (PlayerEntity 相关的逻辑保持不变)
             if (amplifier >= 100) {
                 if (entity.getWorld() instanceof ServerWorld serverWorld) {
-                    PlayerEntity.sendMessageToAllPlayers(true, serverWorld, Text.translatable("dark4").formatted(Formatting.GOLD));
+                    entity.sendMessage( Text.translatable("dark4").formatted(Formatting.GOLD));
                 }
                 darkDamageEntry.ifPresent(damageEntry -> {
                     DamageSource damageSource = new DamageSource(damageEntry);
@@ -104,9 +104,10 @@ public class DarkEffect extends StatusEffect {
                 playerInterface.setDark(100);
             } else if (amplifier == 70) {
                 if (entity.getWorld() instanceof ServerWorld serverWorld) {
-                    PlayerEntity.sendMessageToAllPlayers(dark, serverWorld, Text.translatable("dark3").formatted(Formatting.RED));
+                    entity.sendMessage( Text.translatable("dark3").formatted(Formatting.RED));
                     giveFrenzyEffect(entity);
                 }
+
                 dark = false;
             } else if (amplifier == 31) {
                 dark = true;
@@ -114,7 +115,7 @@ public class DarkEffect extends StatusEffect {
                 playerInterface.setDark(50);
             } else if (amplifier == 30) {
                 if (entity.getWorld() instanceof ServerWorld serverWorld) {
-                    PlayerEntity.sendMessageToAllPlayers(dark, serverWorld, Text.translatable("dark2").formatted(Formatting.DARK_PURPLE));
+                    entity.sendMessage( Text.translatable("dark2").formatted(Formatting.DARK_PURPLE));
                     giveVulnerableEffect(entity);
                 }
                 dark = false;
@@ -122,7 +123,7 @@ public class DarkEffect extends StatusEffect {
                 dark = true;
             } else if (amplifier == 0) {
                 if (entity.getWorld() instanceof ServerWorld serverWorld) {
-                    PlayerEntity.sendMessageToAllPlayers(dark, serverWorld, Text.translatable("dark1").formatted(Formatting.DARK_GRAY));
+                    entity.sendMessage( Text.translatable("dark1").formatted(Formatting.DARK_GRAY));
                     playerInterface.setDark(0);
                 }
                 dark = false;

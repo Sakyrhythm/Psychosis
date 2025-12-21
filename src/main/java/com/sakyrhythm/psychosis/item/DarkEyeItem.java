@@ -4,6 +4,8 @@ import com.sakyrhythm.psychosis.block.DarkPortalFrameBlock;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.custom.EyeOfDarkEntity;
+import com.sakyrhythm.psychosis.world.DarkBlockTracker;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityType;
@@ -35,12 +37,13 @@ import net.minecraft.world.RaycastContext.FluidHandling;
 import net.minecraft.world.event.GameEvent;
 import net.minecraft.world.event.GameEvent.Emitter;
 
-import java.util.function.Predicate;
+import java.util.Optional;
 import net.minecraft.world.chunk.ChunkStatus;
 
 public class DarkEyeItem extends Item {
 
-    private static final int LOCATE_BLOCK_RADIUS = 2000; // 已从 256 更改为 2000
+    // LOCATE_BLOCK_RADIUS 仅用于消息显示，不再限制定位距离
+    private static final int LOCATE_BLOCK_RADIUS = 2000;
     private static final double EYE_SPAWN_HEIGHT_OFFSET = 0.5D;
 
     public DarkEyeItem(Item.Settings settings) {
@@ -92,7 +95,7 @@ public class DarkEyeItem extends Item {
                             serverWorld.getEntitiesByClass(
                                     LivingEntity.class,
                                     searchBox,
-                                    (entity) -> entity != customPlayer
+                                    (entity) -> entity == customPlayer // 只对 customPlayer 的实体造成伤害
                             ).forEach((entity) -> entity.damage(damageSource, customDamage));
                         }
                     }
@@ -113,6 +116,7 @@ public class DarkEyeItem extends Item {
 
     /**
      * 定位特定方块 (ModBlocks.DARK_BLOCK) 的逻辑
+     * 已修改为**无限距离**定位，通过 DarkBlockTracker 优化性能。
      */
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
@@ -125,28 +129,22 @@ public class DarkEyeItem extends Item {
 
         if (!world.isClient) {
 
-            Predicate<BlockState> blockPredicate = (state) -> state.isOf(ModBlocks.DARK_BLOCK);
+            if (!(world instanceof ServerWorld serverWorld)) {
+                return TypedActionResult.pass(stack); // 只在服务端执行定位逻辑
+            }
 
-            // 查找范围现在是 2000 格
-            BlockPos targetPos = BlockPos.findClosest(
-                            player.getBlockPos(),
-                            LOCATE_BLOCK_RADIUS,      // 参 2: 水平搜索半径 (radius)
-                            LOCATE_BLOCK_RADIUS,      // 参 3: 垂直搜索范围 (height)
-                            (BlockPos pos) -> world.getChunk(pos.getX() >> 4, pos.getZ() >> 4).getStatus().isAtLeast(ChunkStatus.FULL)
-                                    && blockPredicate.test(world.getBlockState(pos)) // 参 4: Predicate
-                    )
-                    .orElse(null); // 确保 Optional 被解包
+            // --- 新的无卡顿定位逻辑 ---
+            DarkBlockTracker tracker = DarkBlockTracker.get(serverWorld);
+
+            // 使用 tracker 的 findClosest 方法，该方法现在已移除距离限制
+            Optional<BlockPos> targetPosOptional = tracker.findClosest(player.getBlockPos());
+            BlockPos targetPos = targetPosOptional.orElse(null);
 
 
             if (targetPos == null) {
 
-                // 消息中将显示新的 2000 范围
-                player.sendMessage(
-                        Text.literal("Could not find ")
-                                .append(Text.of(ModBlocks.DARK_BLOCK.getName().getString()).copy().formatted(Formatting.AQUA))
-                                .append(Text.literal(" within " + LOCATE_BLOCK_RADIUS + " blocks.")).formatted(Formatting.RED),
-                        false
-                );
+                // 修改错误消息以匹配无限距离的逻辑
+                player.sendMessage( Text.translatable("cantfind").formatted(Formatting.DARK_PURPLE));
 
                 return TypedActionResult.fail(stack);
             }
