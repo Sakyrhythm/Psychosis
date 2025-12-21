@@ -16,12 +16,15 @@ import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Block;
+import net.minecraft.entity.damage.DamageEffects;
+import net.minecraft.entity.damage.DamageScaling;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.effect.StatusEffect;
@@ -62,6 +65,8 @@ public class Psychosis implements ModInitializer {
 	public static final StatusEffect DarkEffect = new DarkEffect();
 	public static final StatusEffect VulnerableEffect = new VulnerableEffect();
 	public static final StatusEffect FRENZYEffect = new VulnerableEffect();
+
+	// 注册键定义，必须与您的 JSON 文件路径匹配
 	public static final RegistryKey<DamageType> DARK_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "dark"));
 	public static final RegistryKey<DamageType> SHADOW_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "shadow"));
 	public static final RegistryKey<DamageType> FRENZY_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "frenzy"));
@@ -92,7 +97,6 @@ public class Psychosis implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-
 		// =========================================================================
 		// *** 永久注册 Tick 事件监听器来处理所有延迟卸载任务 (取代 unregister) ***
 		// =========================================================================
@@ -130,6 +134,19 @@ public class Psychosis implements ModInitializer {
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "dark"), DarkEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "vulnerable"), VulnerableEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "frenzy"), FRENZYEffect);
+
+		// 🌟 添加 Data Pack 检查日志 (用于调试新/旧存档问题) 🌟
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			Optional<RegistryEntry.Reference<DamageType>> checkEntry = server.getRegistryManager()
+					.get(RegistryKeys.DAMAGE_TYPE)
+					.getEntry(Psychosis.DARK_DAMAGE);
+
+			if (checkEntry.isPresent()) {
+				LOGGER.info("✅ SUCCESS: Dark Damage Type ({}) loaded.", Psychosis.DARK_DAMAGE.getValue());
+			} else {
+				LOGGER.error("❌ FAILURE: Dark Damage Type ({}) is MISSING from the registry. Data pack issue suspected!", Psychosis.DARK_DAMAGE.getValue());
+			}
+		});
 
 		UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
 			if (world.isClient() || !(world instanceof ServerWorld serverWorld)) {

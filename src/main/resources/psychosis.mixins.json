@@ -5,7 +5,8 @@
   "mixins": [
     "ChunkGeneratorMixin",
     "LivingEntityMixin",
-    "PlayerMixin"
+    "PlayerMixin",
+    "StatusEffectInstanceMixin"
   ],
   "injectors": {
     "defaultRequire": 1
