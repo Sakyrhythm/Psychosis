@@ -84,6 +84,22 @@ public abstract class PlayerMixin implements IPlayerEntity {
 
         IPlayerEntity playerInterface = (IPlayerEntity) player; // 提前获取接口实例
 
+        // 【死亡时清除逻辑】: 检查玩家是否死亡 (生命值 <= 0)
+        if (player.getHealth() <= 0.0F) {
+            // 如果玩家生命值为0，执行完全重置
+            if (!player.getWorld().isClient()) { // 仅在服务器端执行重置
+                Psychosis.LOGGER.info("Player {} health is zero. Executing full psychosis state reset.", player.getName().getString());
+                
+                // 执行完全重置：
+                playerInterface.setDark(0);
+                playerInterface.setNoticed(false);
+                playerInterface.setDarkMsg1Sent(false);
+                playerInterface.setDarkMsg2Sent(false);
+                playerInterface.setDarkMsg3Sent(false);
+                playerInterface.setDarkMsg4Sent(false);
+            }
+            return; // 生命值为0时，跳过后续的 tick 逻辑
+        }
 
         // 1. 仅在服务器端处理 'noticed' 状态变化逻辑
         if (!player.getWorld().isClient()) {
