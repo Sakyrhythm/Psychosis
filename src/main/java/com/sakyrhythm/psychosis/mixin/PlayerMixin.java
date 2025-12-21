@@ -84,6 +84,7 @@ public abstract class PlayerMixin implements IPlayerEntity {
         if (darkEffectEntry != null && !player.hasStatusEffect(darkEffectEntry)) {
             IPlayerEntity playerInterface = (IPlayerEntity) player;
             playerInterface.setDark(0);
+            playerInterface.setNoticed(false);
         }
     }
 }

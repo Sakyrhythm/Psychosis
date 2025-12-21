@@ -5,9 +5,9 @@
 
     "type": "minecraft:concentric_rings",
 
-    "count": 128,
+    "count": 256,
 
-    "distance": 32,
+    "distance": 16,
 
     "preferred_biomes": "psychosis:dark_biome",
 
