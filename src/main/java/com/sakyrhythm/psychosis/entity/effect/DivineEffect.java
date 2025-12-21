@@ -11,7 +11,7 @@ public class DivineEffect extends StatusEffect{
     public DivineEffect() {
         super(
                 StatusEffectCategory.BENEFICIAL, // 药水效果是有益的
-                0x45283C); // 显示的颜色 (深紫色/洋红色)
+                0xFFD700); // 显示的颜色 (金色)
     }
 
     /**
