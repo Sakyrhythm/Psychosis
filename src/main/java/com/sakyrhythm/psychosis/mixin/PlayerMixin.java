@@ -23,7 +23,7 @@ public abstract class PlayerMixin implements IPlayerEntity {
     @Unique
     private int dark = 0;
     @Unique
-    private boolean noticed = false;
+    public boolean noticed = false;
     @Unique
     private boolean previousNoticed = false;
 
@@ -89,7 +89,7 @@ public abstract class PlayerMixin implements IPlayerEntity {
             // 如果玩家生命值为0，执行完全重置
             if (!player.getWorld().isClient()) { // 仅在服务器端执行重置
                 Psychosis.LOGGER.info("Player {} health is zero. Executing full psychosis state reset.", player.getName().getString());
-                
+
                 // 执行完全重置：
                 playerInterface.setDark(0);
                 playerInterface.setNoticed(false);

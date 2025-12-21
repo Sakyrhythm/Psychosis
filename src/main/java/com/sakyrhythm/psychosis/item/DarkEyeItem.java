@@ -4,6 +4,7 @@ import com.sakyrhythm.psychosis.block.DarkPortalFrameBlock;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.custom.EyeOfDarkEntity;
+import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 
 import net.minecraft.block.Block;
@@ -129,6 +130,7 @@ public class DarkEyeItem extends Item {
 
         if (!world.isClient) {
 
+
             if (!(world instanceof ServerWorld serverWorld)) {
                 return TypedActionResult.pass(stack); // 只在服务端执行定位逻辑
             }
@@ -139,7 +141,11 @@ public class DarkEyeItem extends Item {
             // 使用 tracker 的 findClosest 方法，该方法现在已移除距离限制
             Optional<BlockPos> targetPosOptional = tracker.findClosest(player.getBlockPos());
             BlockPos targetPos = targetPosOptional.orElse(null);
-
+            if (player instanceof IPlayerEntity playerInterface && !playerInterface.getNoticed()) {
+                if(!playerInterface.getNoticed()){
+                    targetPos=null;
+                }
+            }
 
             if (targetPos == null) {
 
@@ -151,7 +157,6 @@ public class DarkEyeItem extends Item {
 
             // --- 输出定位到的坐标 (仅对投掷玩家显示) ---
             System.out.println("Dark Eye found target block at: " + targetPos.toShortString());
-
             player.sendMessage(
                     Text.translatable("Target found at: ")
                             .append(Text.literal(targetPos.getX() + ", " + targetPos.getY() + ", " + targetPos.getZ()).formatted(Formatting.AQUA)),
