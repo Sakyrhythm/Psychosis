@@ -28,6 +28,7 @@ public class PsychosisModClient implements ClientModInitializer {
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_STEVE, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,false),64,64));
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_SLIM, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,true),64,64));
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);
+        EntityRendererRegistry.register(ModEntities.EYE_OF_DARK, EyeOfDarkRenderer::new);
         EntityRendererRegistry.register(ModEntities.DEGENERATEWITHER, DWitherEntityRenderer::new);
 
         // 3. 关键一步：将你的单头模型数据注册到自定义的模型层上

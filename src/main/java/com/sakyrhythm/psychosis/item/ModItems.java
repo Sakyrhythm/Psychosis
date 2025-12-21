@@ -9,7 +9,7 @@ import net.minecraft.util.Identifier;
 
 public class ModItems {
     public static final Item VOID_ESSENCE = registerItem("void_essence", new Item(new Item.Settings()));
-    public static final Item ENDER_EYE = registerItem("dark_eye", new DarkEyeItem(new Item.Settings()));
+    public static final Item Dark_EYE = registerItem("dark_eye", new DarkEyeItem(new Item.Settings()));
     private static Item registerItem(String id, Item item){
         return Registry.register(Registries.ITEM, Identifier.of(Psychosis.MOD_ID,id), item);
     }

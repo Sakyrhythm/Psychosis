@@ -20,7 +20,7 @@ import net.minecraft.particle.ParticleTypes;
 
 public class ModBiomes {
     public static final RegistryKey<Biome> DARK_BIOME = RegistryKey.of(RegistryKeys.BIOME,
-            Identifier.of(Psychosis.MOD_ID, "dark_biome"));
+            Identifier.of("psychosis:dark_biome"));
 
     public static void globalOverWorldGeneration(GenerationSettings.LookupBackedBuilder builder) {
         DefaultBiomeFeatures.addLandCarvers(builder); // 洞穴,峡谷

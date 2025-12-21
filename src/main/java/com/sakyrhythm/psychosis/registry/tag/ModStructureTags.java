@@ -10,6 +10,6 @@ public interface ModStructureTags {
     TagKey<Structure> DARK_EYE_LOCATED = of("dark");
 
     private static TagKey<Structure> of(String id) {
-        return TagKey.of(RegistryKeys.STRUCTURE, Identifier.of(id));
+        return TagKey.of(RegistryKeys.STRUCTURE, Identifier.of(Psychosis.MOD_ID, id));
     }
 }
