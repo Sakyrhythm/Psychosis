@@ -168,7 +168,7 @@ public class NoticedBottle extends PotionItem {
         // 这样就阻止了父类 PotionItem 检测到空药水内容并显示“无效果”文本。
 
         // Tooltip 无法获取玩家身上的实时效果，因此只显示默认信息
-        int darkEffectAmplifierForTooltip = 0;
+        //int darkEffectAmplifierForTooltip = 0;
 
         // 从静态注册表安全获取效果条目
         RegistryEntry<StatusEffect> darkEffectEntryForTooltip = Registries.STATUS_EFFECT

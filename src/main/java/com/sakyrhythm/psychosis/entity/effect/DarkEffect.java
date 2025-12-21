@@ -44,6 +44,7 @@ public class DarkEffect extends StatusEffect {
             iEntity.psychosis_template_1_21$setCBHurt(true);
         }
     }
+    private RegistryEntry<StatusEffect> darkEffectEntry;
 
     // ⚠️ 移除 initializeEntries 方法
 
@@ -63,11 +64,22 @@ public class DarkEffect extends StatusEffect {
     public void giveVulnerableEffect(LivingEntity entity) {
         getStatusEffectEntry(entity, "vulnerable").ifPresent(entry -> entity.addStatusEffect(new StatusEffectInstance(entry, StatusEffectInstance.INFINITE, 0, false, true, true)));
     }
-
     public void giveFrenzyEffect(LivingEntity entity) {
         getStatusEffectEntry(entity, "frenzy").ifPresent(entry -> entity.addStatusEffect(new StatusEffectInstance(entry, StatusEffectInstance.INFINITE, 0, false, true, true)));
     }
 
+    public void removeEffect(LivingEntity entity, String id) {
+        if (darkEffectEntry == null) {
+            darkEffectEntry = entity.getWorld().getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, net.minecraft.util.Identifier.of(Psychosis.MOD_ID, "dark")))
+                    .orElse(null); // <--- ADDED .orElse(null) HERE
+            if (darkEffectEntry == null) {
+                return;
+            }
+        }
+        getStatusEffectEntry(entity, id).ifPresent(entry -> entity.removeStatusEffect(darkEffectEntry));
+    }
     // --- 主更新逻辑 ---
 
     @Override
@@ -104,6 +116,7 @@ public class DarkEffect extends StatusEffect {
                         DamageSource damageSource = new DamageSource(damageEntry);
                         entity.damage(damageSource, Float.MAX_VALUE);
                     });
+                    removeEffect(entity,"dark");
                     playerInterface.setDark(101); // 设置最高锁
                 }
             }

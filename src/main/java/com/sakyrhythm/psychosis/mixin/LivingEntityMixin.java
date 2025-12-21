@@ -5,6 +5,7 @@ import com.sakyrhythm.psychosis.interfaces.ILivingEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageType;
+import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
@@ -17,7 +18,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.spongepowered.asm.mixin.injection.invoke.arg.Args; // New import
+import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin implements ILivingEntity {
@@ -25,6 +26,10 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     @Nullable
     private LivingEntity lastAttacker = null;
 
+    @Unique
+    private RegistryEntry.Reference<DamageType> shadowDamageEntry;
+    @Unique
+    private RegistryEntry.Reference<DamageType> darkDamageEntry;
     @Override
     public @Nullable LivingEntity psychosis_template_1_21$getLastAttacker() {
         return this.lastAttacker;
@@ -73,9 +78,11 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     private void setLastAttacker(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (source.getAttacker() instanceof LivingEntity attacker) {
             // 保存当前的攻击者
-            ((ILivingEntity)this).psychosis_template_1_21$setLastAttacker(attacker);
+            this.psychosis_template_1_21$setLastAttacker(attacker);
         }
     }
+
+    // --- 🎯 修改后的 modifyDamageCooldownSet：免疫黑暗纠缠无敌帧删除 ---
     @Redirect(
             method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z",
             at = @At(
@@ -87,15 +94,28 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     )
     private void modifyDamageCooldownSet(LivingEntity entity, int value) {
         if (entity instanceof ILivingEntity iLivingEntity) {
-            if (iLivingEntity.psychosis_template_1_21$getCBHurt()) {
+
+            // 检查是否有 DivineEffect
+            RegistryEntry<StatusEffect> divineEffectEntry = entity.getWorld()
+                    .getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "divine")))
+                    .orElse(null);
+
+            boolean hasDivineEffect = (divineEffectEntry != null && entity.hasStatusEffect(divineEffectEntry));
+            if (iLivingEntity.psychosis_template_1_21$getCBHurt() && !hasDivineEffect) {
                 entity.timeUntilRegen = 0;
-            } else {
+            } else if(hasDivineEffect) {
+                entity.timeUntilRegen = 40;
+            }
+            else {
                 entity.timeUntilRegen = value;
             }
         } else {
             entity.timeUntilRegen = value;
         }
     }
+
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         long darktime = psychopomp$getLastDarkDamageTime();
@@ -117,6 +137,7 @@ public abstract class LivingEntityMixin implements ILivingEntity {
         LivingEntity livingEntity = (LivingEntity) (Object) this;
         float finalDamage = originalAmount;
 
+        // 1. 其他效果的原始逻辑 (vulnerable, frenzy)
         RegistryEntry<StatusEffect> vulnerableEffectEntry = livingEntity.getWorld()
                 .getRegistryManager()
                 .get(RegistryKeys.STATUS_EFFECT)
@@ -147,6 +168,46 @@ public abstract class LivingEntityMixin implements ILivingEntity {
                     attacker.damage(selfDamageSource, selfDamage);
                 }
             }
+        }
+
+        // 2. DivineEffect 伤害减免和伤害上限逻辑
+        RegistryEntry<StatusEffect> divineEffectEntry = livingEntity.getWorld()
+                .getRegistryManager()
+                .get(RegistryKeys.STATUS_EFFECT)
+                .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "divine")))
+                .orElse(null);
+
+        if (divineEffectEntry != null && livingEntity.hasStatusEffect(divineEffectEntry)) {
+            if (darkDamageEntry == null) {
+                darkDamageEntry = livingEntity.getWorld().getRegistryManager()
+                        .get(RegistryKeys.DAMAGE_TYPE)
+                        .getEntry(Psychosis.DARK_DAMAGE)
+                        .orElse(null); // .orElse(null) works here because darkDamageEntry is RegistryEntry.Reference
+                if (darkDamageEntry == null) {
+                    return finalDamage;
+                }
+            }
+            if (shadowDamageEntry == null) {
+                shadowDamageEntry = livingEntity.getWorld().getRegistryManager()
+                        .get(RegistryKeys.DAMAGE_TYPE)
+                        .getEntry(Psychosis.SHADOW_DAMAGE)
+                        .orElse(null); // .orElse(null) works here because darkDamageEntry is RegistryEntry.Reference
+                if (shadowDamageEntry == null) {
+                    return finalDamage;
+                }
+            }
+            // a. 魔法伤害减免 80%
+            if (source.isOf(DamageTypes.MAGIC)||source.isOf(darkDamageEntry.registryKey())||source.isOf(shadowDamageEntry.registryKey())) {
+
+                finalDamage *= (1.0f - 0.80f); // 20% 伤害
+            }
+
+            // b. 伤害上限：90% 最大生命值
+            float maxHealth = livingEntity.getMaxHealth();
+            float damageCap = maxHealth * 0.90f;
+
+            // 最终伤害不超过伤害上限
+            finalDamage = Math.min(finalDamage, damageCap);
         }
 
         return finalDamage;

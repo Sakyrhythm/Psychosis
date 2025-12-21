@@ -8,6 +8,8 @@ import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
+import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
+import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
 import com.sakyrhythm.psychosis.entity.effect.VulnerableEffect;
 import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
@@ -23,13 +25,10 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Block;
-import net.minecraft.entity.damage.DamageEffects;
-import net.minecraft.entity.damage.DamageScaling;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.item.BlockItem;
-import net.minecraft.potion.Potions;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
@@ -65,7 +64,8 @@ public class Psychosis implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	public static final StatusEffect DarkEffect = new DarkEffect();
 	public static final StatusEffect VulnerableEffect = new VulnerableEffect();
-	public static final StatusEffect FRENZYEffect = new VulnerableEffect();
+	public static final StatusEffect FrenzyEffect = new FrenzyEffect();
+	public static final StatusEffect DivineEffect = new DivineEffect();
 
 	// 注册键定义，必须与您的 JSON 文件路径匹配
 	public static final RegistryKey<DamageType> DARK_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "dark"));
@@ -134,7 +134,8 @@ public class Psychosis implements ModInitializer {
 
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "dark"), DarkEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "vulnerable"), VulnerableEffect);
-		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "frenzy"), FRENZYEffect);
+		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "frenzy"), FrenzyEffect);
+		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "divine"), DivineEffect);
 
 		// 🌟 添加 Data Pack 检查日志 (用于调试新/旧存档问题) 🌟
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
