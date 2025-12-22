@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "#": {
+      "item": "psychosis:white_eye"
+    },
+    "X": {
+      "item": "minecraft:diamond"
+    },
+    "Y": {
+      "item": "minecraft:golden_leggings"
+    },
+    "Z": {
+      "item": "minecraft:gold_block"
+    }
+  },
+  "pattern": [
+    " X ",
+    "ZYZ",
+    "Z#Z"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:divine_leggings"
+  }
+}

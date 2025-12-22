@@ -24,4 +24,6 @@ public interface IPlayerEntity {
 
     void setDarkMsg4Sent(boolean sent);
     boolean getDarkMsg4Sent();
+
+    int[] queryDarkEffectInfo();
 }

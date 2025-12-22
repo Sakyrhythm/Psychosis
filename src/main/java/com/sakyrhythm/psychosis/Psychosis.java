@@ -6,14 +6,16 @@ import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.datafixers.util.Pair;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
-import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
+import com.sakyrhythm.psychosis.entity.custom.PlayerEntity; // 注意这里的 PlayerEntity 可能是你的自定义实体
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
 import com.sakyrhythm.psychosis.entity.effect.VulnerableEffect;
 import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
+import com.sakyrhythm.psychosis.item.ModArmorItems;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
 import com.sakyrhythm.psychosis.item.ModItems;
+import com.sakyrhythm.psychosis.mixin.PlayerMixin; // 导入 PlayerMixin
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -67,12 +69,12 @@ public class Psychosis implements ModInitializer {
 	public static final StatusEffect FrenzyEffect = new FrenzyEffect();
 	public static final StatusEffect DivineEffect = new DivineEffect();
 
-	// 注册键定义，必须与您的 JSON 文件路径匹配
+	// 注册键定义
 	public static final RegistryKey<DamageType> DARK_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "dark"));
 	public static final RegistryKey<DamageType> SHADOW_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "shadow"));
 	public static final RegistryKey<DamageType> FRENZY_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "frenzy"));
 
-	// *** 自定义定位命令所需常量 ***
+	// 自定义定位命令所需常量
 	public static final Identifier DARK_STRUCTURE_ID = Identifier.of(MOD_ID, "dark");
 	public static final RegistryKey<Structure> DARK_STRUCTURE_KEY = RegistryKey.of(RegistryKeys.STRUCTURE, DARK_STRUCTURE_ID);
 
@@ -80,9 +82,7 @@ public class Psychosis implements ModInitializer {
 			new DynamicCommandExceptionType((id) -> Text.translatable("commands.locate.structure.not_found", id));
 	private static final int LOCATE_STRUCTURE_RADIUS = 100;
 
-	// =========================================================================
-	// *** 用于存储和管理延迟卸载任务的静态列表和任务类 ***
-	// =========================================================================
+	// 用于存储和管理延迟卸载任务的静态列表和任务类
 	private static final List<ForcedChunkTask> CHUNK_UNLOAD_TASKS = new ArrayList<>();
 
 	public static class ForcedChunkTask {
@@ -98,28 +98,20 @@ public class Psychosis implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		// =========================================================================
-		// *** 永久注册 Tick 事件监听器来处理所有延迟卸载任务 (取代 unregister) ***
-		// =========================================================================
+		// 永久注册 Tick 事件监听器来处理所有延迟卸载任务
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
-			// 使用 removeIf 迭代器进行安全移除 (关键！)
+			// 使用 removeIf 迭代器进行安全移除
 			CHUNK_UNLOAD_TASKS.removeIf(task -> {
-				// 1. 检查计时器是否到达 0
 				if (task.timer.decrementAndGet() <= 0) {
-
-					// 2. 执行卸载逻辑
+					// 执行卸载逻辑
 					for (int dx = -1; dx <= 1; dx++) {
 						for (int dz = -1; dz <= 1; dz++) {
-							// 强制卸载区块
 							task.world.setChunkForced(task.centerChunk.x + dx, task.centerChunk.z + dz, false);
 						}
 					}
 					LOGGER.info("Unloaded 3x3 forced chunks around: {} after 1 second delay.", task.centerChunk.toString());
-
-					// 3. 返回 true，告诉 removeIf 移除此任务
 					return true;
 				}
-				// 4. 返回 false，保留此任务继续计时
 				return false;
 			});
 		});
@@ -128,6 +120,7 @@ public class Psychosis implements ModInitializer {
 		FabricDefaultAttributeRegistry.register(ModEntities.DEGENERATEWITHER, PlayerEntity.createPlayerAttributes());
 
 		ModItems.registerModItems();
+		ModArmorItems.registerModItems();
 		ModItemGroups.registerModItemGroups();
 		ModBlocks.registerModBlocks();
 		ModEntities.registerAttributes();
@@ -137,7 +130,6 @@ public class Psychosis implements ModInitializer {
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "frenzy"), FrenzyEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "divine"), DivineEffect);
 
-		// 🌟 添加 Data Pack 检查日志 (用于调试新/旧存档问题) 🌟
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			Optional<RegistryEntry.Reference<DamageType>> checkEntry = server.getRegistryManager()
 					.get(RegistryKeys.DAMAGE_TYPE)
@@ -187,9 +179,7 @@ public class Psychosis implements ModInitializer {
 			return ActionResult.PASS;
 		});
 
-		// =========================================================================
-		// *** 区块加载事件，用于追踪旧世界和重启服务器后加载的 DARK_BLOCK ***
-		// =========================================================================
+		// 区块加载事件，用于追踪旧世界和重启服务器后加载的 DARK_BLOCK
 		ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
 			if (!(world instanceof ServerWorld serverWorld)) {
 				return;
@@ -221,13 +211,14 @@ public class Psychosis implements ModInitializer {
 		});
 
 		// =========================================================================
-		// *** 命令注册 (要求权限等级 >= 2) ***
+		// *** 命令注册 ***
 		// =========================================================================
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(literal("psychosis")
+					// 1. 测试伤害命令
 					.then(literal("test-damage")
-							.requires((source) -> source.hasPermissionLevel(2)) // 要求管理员权限
+							.requires((source) -> source.hasPermissionLevel(2))
 							.executes(context -> {
 								ServerCommandSource source = context.getSource();
 								ServerPlayerEntity player = source.getPlayer();
@@ -252,10 +243,46 @@ public class Psychosis implements ModInitializer {
 								}
 							})
 					)
+					// 2. 定位命令
 					.then(literal("locate")
 							.then(literal("dark")
-									.requires((source) -> source.hasPermissionLevel(2)) // 要求管理员权限
+									.requires((source) -> source.hasPermissionLevel(2))
 									.executes(context -> executeLocateDarkStructure(context.getSource()))
+							)
+					)
+					// 3. ⭐ 新增查询 DarkEffect 状态命令
+					.then(literal("status")
+							.then(literal("dark")
+									.requires((source) -> source.hasPermissionLevel(0))
+									.executes(context -> {
+										ServerCommandSource source = context.getSource();
+										ServerPlayerEntity player = source.getPlayer();
+										if (player == null) {
+											source.sendError(Text.literal("只有玩家可以执行此命令"));
+											return 0;
+										}
+
+										// 调用 Mixin 中实现的查询方法
+										IPlayerEntity playerMixin = (IPlayerEntity) (Object) player;
+										int[] darkInfo = playerMixin.queryDarkEffectInfo();
+										int level = darkInfo[0];
+										int duration = darkInfo[1];
+
+										if (level > 0) {
+											double durationSeconds = (double) duration / 20.0;
+
+											source.sendFeedback(() ->
+															Text.literal("✅ DarkEffect 状态: 等级 ")
+																	.append(Text.literal(String.valueOf(level)).withColor(0xFF00FF))
+																	.append(Text.literal(", 剩余时间: "))
+																	.append(Text.literal(String.format("%.1f", durationSeconds) + " 秒").withColor(0x00FFFF)),
+													false);
+											return 1;
+										} else {
+											source.sendFeedback(() -> Text.literal("❌ DarkEffect 不存在于你身上。").withColor(0xFF0000), false);
+											return 0;
+										}
+									})
 							)
 					)
 			);
@@ -264,51 +291,42 @@ public class Psychosis implements ModInitializer {
 
 	public static void forceAndScheduleUnload(ServerWorld world, BlockPos pos) {
 
-		// 1. 结构定位逻辑 (从 executeLocateDarkStructure 复制)
-
 		Registry<Structure> structureRegistry = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
 
-		// 检查结构注册表，如果找不到，则中止并记录错误
 		Optional<RegistryEntry.Reference<Structure>> optionalEntry = structureRegistry.getEntry(DARK_STRUCTURE_KEY);
 
 		if (optionalEntry.isEmpty()) {
 			LOGGER.error("Failed to locate DARK_STRUCTURE: Registry entry is missing.");
-			return; // 无法定位，直接返回
+			return;
 		}
 
 		RegistryEntry.Reference<Structure> structureReference = optionalEntry.get();
 		RegistryEntryList<Structure> structureList = RegistryEntryList.of(new RegistryEntry[]{structureReference});
 
-		// 使用传入的 pos 作为搜索起点
 		BlockPos currentPos = BlockPos.ofFloored(pos.getX(), pos.getY(), pos.getZ());
 
-		// 执行定位操作 (使用与命令相同的 100 区块半径)
 		Pair<BlockPos, RegistryEntry<Structure>> pair = world.getChunkManager().getChunkGenerator().locateStructure(
 				world,
 				structureList,
 				currentPos,
-				LOCATE_STRUCTURE_RADIUS, // 100 区块半径
+				LOCATE_STRUCTURE_RADIUS,
 				false
 		);
 
 		if (pair == null) {
 			LOGGER.info("Player was noticed but could not find DARK_STRUCTURE within {} chunks of {}", LOCATE_STRUCTURE_RADIUS, currentPos.toShortString());
-			return; // 未找到结构，直接返回
+			return;
 		}
 
-		// 2. 强制加载和调度卸载 (从 executeLocateDarkStructure 复制)
-
-		BlockPos resultPos = pair.getFirst(); // 找到的结构位置
+		BlockPos resultPos = pair.getFirst();
 		ChunkPos centerChunk = new ChunkPos(resultPos);
 
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dz = -1; dz <= 1; dz++) {
-				// 强制加载 3x3 区块
 				world.setChunkForced(centerChunk.x + dx, centerChunk.z + dz, true);
 			}
 		}
 
-		// 3. 调度卸载任务
 		CHUNK_UNLOAD_TASKS.add(new ForcedChunkTask(world, centerChunk));
 
 		LOGGER.info("Player was noticed! Forced 3x3 chunks for DARK_STRUCTURE around: {} (Distance: {} blocks)",
@@ -358,6 +376,14 @@ public class Psychosis implements ModInitializer {
 			CHUNK_UNLOAD_TASKS.add(new ForcedChunkTask(serverWorld, centerChunk));
 			int distance = MathHelper.floor(getHorizontalDistance(currentPos.getX(), currentPos.getZ(), resultPos.getX(), resultPos.getZ()));
 			LOGGER.info("Locating element " + entryString + " took " + timeTaken.toMillis() + " ms. Forced 3x3 chunks for 1 second around: {}", resultPos.toShortString());
+
+			source.sendFeedback(() -> Text.translatable("commands.locate.structure.success",
+					DARK_STRUCTURE_ID.toString(),
+					resultPos.getX(),
+					resultPos.getY(),
+					resultPos.getZ(),
+					distance
+			), false);
 			return distance;
 		}
 	}

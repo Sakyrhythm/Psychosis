@@ -1,0 +1,31 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "#": {
+      "item": "psychosis:white_eye"
+    },
+    "X": {
+      "item": "minecraft:totem_of_undying"
+    },
+    "Z": {
+      "item": "minecraft:gold_block"
+    },
+    "E": {
+      "item": "minecraft:echo_shard"
+    },
+    "G": {
+      "item": "minecraft:enchanted_golden_apple"
+    }
+  },
+  "pattern": [
+    "X X",
+    "G#G",
+    "EZE"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:divine_chestplate"
+  }
+}

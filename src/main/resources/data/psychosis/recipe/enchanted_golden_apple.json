@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "X": {
+      "item": "minecraft:apple"
+    },
+    "Z": {
+      "item": "minecraft:gold_block"
+    }
+  },
+  "pattern": [
+    "ZZZ",
+    "ZXZ",
+    "ZZZ"
+  ],
+  "result": {
+    "count": 1,
+    "id": "minecraft:enchanted_golden_apple"
+  }
+}

@@ -24,6 +24,10 @@ public class ModItemGroups {
                         entries.add(ModItems.Dark_EYE);
                         entries.add(ModItems.NoticedBottle);
                         entries.add(ModItems.White_EYE);
+                        entries.add(ModArmorItems.DIVINE_HELMET);
+                        entries.add(ModArmorItems.DIVINE_CHESTPLATE);
+                        entries.add(ModArmorItems.DIVINE_LEGGINGS);
+                        entries.add(ModArmorItems.DIVINE_BOOTS);
                     }).build());
 
     public static void registerModItemGroups() {

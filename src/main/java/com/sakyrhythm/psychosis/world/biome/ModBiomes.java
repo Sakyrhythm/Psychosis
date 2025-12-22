@@ -41,7 +41,7 @@ public class ModBiomes {
         // 添加敌对生物~只保留一些更具威胁性的或符合主题的
         DefaultBiomeFeatures.addMonsters(spawnSettings, 95, 5, 100, false); // 默认怪物生成
 
-        spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(ModEntities.PLAYER, 20, 1, 3)); // 增加PlayerEntity生成，权重高
+        spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(ModEntities.PLAYER, 20, 1, 3));
 
         // 666恶魂都来了
         spawnSettings.spawn(SpawnGroup.MONSTER, new SpawnSettings.SpawnEntry(EntityType.ZOMBIE, 10, 4, 8));

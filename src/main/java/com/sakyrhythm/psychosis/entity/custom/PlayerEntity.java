@@ -194,10 +194,8 @@ public class PlayerEntity extends AnimalEntity {
             ItemStack void_essence = new ItemStack(ModItems.VOID_ESSENCE, voidCount);
             for (int i = 0; i < voidCount; i++)
                 this.dropItem(void_essence.getItem());
+
         }
-        //if (!this.getWorld().isClient) {
-        //    this.getWorld().createExplosion(this, this.getX(), this.getEyeY(), this.getZ(), 7.0F, false, ExplosionSourceType.MOB);
-        //}
     }
 
     @Override

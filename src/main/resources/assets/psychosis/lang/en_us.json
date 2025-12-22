@@ -3,6 +3,10 @@
   "item.psychosis.white_eye": "The WHITE",
   "item.psychosis.dark_eye": "Demon Eye",
   "item.psychosis.noticed_bottle": "The Sealing Jar",
+  "item.psychosis.divine_helmet": "Divine Helmet",
+  "item.psychosis.divine_chestplate": "Divine Chestplate",
+  "item.psychosis.divine_leggings": "Divine Leggings",
+  "item.psychosis.divine_boots": "Divine Boots",
   "block.psychosis.dark_portal_frame": "Dark Pylon",
   "block.psychosis.dark_stone": "Fouled Stone",
   "block.psychosis.dark_dirt": "Blighted Earth",
@@ -23,5 +27,8 @@
   "entity.psychosis.player": "Fake Player",
   "cantfind": "If you gaze long into an abyss, the abyss also gazes into you.",
   "notice": "Demon",
-  "notice1": "Gaze"
+  "notice1": "Gaze",
+  "limit_damage_save": "I refuse to die!",
+  "title.psychosis.divine_cap_title": "I refuse to die!",
+  "title.psychosis.divine_cap_subtitle": "Stay alive"
 }

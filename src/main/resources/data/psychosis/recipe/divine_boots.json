@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "#": {
+      "item": "psychosis:white_eye"
+    },
+    "X": {
+      "item": "minecraft:golden_boots"
+    },
+    "Y": {
+      "item": "minecraft:gold_nugget"
+    },
+    "Z": {
+      "item": "minecraft:gold_block"
+    }
+  },
+  "pattern": [
+    " # ",
+    "ZXZ",
+    "Y Y"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:divine_boots"
+  }
+}

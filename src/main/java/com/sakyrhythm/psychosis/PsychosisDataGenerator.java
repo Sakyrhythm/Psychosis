@@ -1,5 +1,6 @@
 package com.sakyrhythm.psychosis;
 
+import com.sakyrhythm.psychosis.datagen.ModModelsProvider;
 import com.sakyrhythm.psychosis.datagen.ModWorldGen;
 import com.sakyrhythm.psychosis.world.biome.ModBiomes;
 import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
@@ -11,7 +12,7 @@ public class PsychosisDataGenerator implements DataGeneratorEntrypoint {
 	@Override
 	public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
 		FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
-
+		pack.addProvider(ModModelsProvider::new);
 		pack.addProvider(ModWorldGen::new);
 	}
 

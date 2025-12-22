@@ -85,61 +85,38 @@ public class DarkEffect extends StatusEffect {
     @Override
     public boolean applyUpdateEffect(LivingEntity entity, int amplifier) {
         // 每次 Tick 时，动态获取最新的 DamageType 引用
-        Optional<RegistryEntry.Reference<DamageType>> currentDarkDamageEntry = getDamageTypeEntry(entity);
-
         if (entity.getHealth() <= 0.0F) {
             return super.applyUpdateEffect(entity, amplifier);
         }
+        Optional<RegistryEntry.Reference<DamageType>> currentDarkDamageEntry = getDamageTypeEntry(entity);
 
         if (entity instanceof IPlayerEntity playerInterface) {
             ServerWorld serverWorld = entity.getWorld() instanceof ServerWorld ? (ServerWorld) entity.getWorld() : null;
-
             int currentLock = playerInterface.getDark();
 
             // -------------------------------------------------------------
-            // 🚨 关键修改：移除所有 'else' 关键字，实现累进解锁 (Cascading Unlock)
+            // 🚨 修正算法：按顺序检查，高等级触发所有低等级解锁
             // -------------------------------------------------------------
 
-            // --- 阶段 4: 等级 >= 100 (致死阶段) ---
-            if (amplifier >= 100) {
-                // 锁的等级必须是 101 或更高
-                if (currentLock < 101) {
-                    if (!playerInterface.getDarkMsg4Sent()) {
+            // --- 阶段 1: 等级 >= 0 (基础阶段) ---
+            // 药水等级必须满足 >= 0，且锁等级必须低于 1
+            if (amplifier >= 0) {
+                if (currentLock < 1) { // 检查是否已解锁
+                    if (!playerInterface.getDarkMsg1Sent()) {
                         if (serverWorld != null) {
-                            entity.sendMessage(Text.translatable("dark4").formatted(Formatting.GOLD));
+                            entity.sendMessage(Text.translatable("dark1").formatted(Formatting.DARK_GRAY));
                         }
-                        playerInterface.setDarkMsg4Sent(true);
+                        playerInterface.setDarkMsg1Sent(true);
                     }
-
-                    // 造成致死伤害 (使用动态获取的引用)
-                    currentDarkDamageEntry.ifPresent(damageEntry -> {
-                        DamageSource damageSource = new DamageSource(damageEntry);
-                        entity.damage(damageSource, Float.MAX_VALUE);
-                    });
-                    removeEffect(entity,"dark");
-                    playerInterface.setDark(101); // 设置最高锁
-                }
-            }
-
-            // --- 阶段 3: 等级 >= 70 ---
-            // 药水等级满足 70 级 **且** 锁的等级必须低于 100 才能触发
-            if (amplifier >= 70) {
-                if (currentLock < 100) {
-                    if (!playerInterface.getDarkMsg3Sent()) {
-                        if (serverWorld != null) {
-                            entity.sendMessage(Text.translatable("dark3").formatted(Formatting.RED));
-                            giveFrenzyEffect(entity);
-                        }
-                        playerInterface.setDarkMsg3Sent(true);
-                    }
-                    playerInterface.setDark(100); // 设置 70 级阶段锁
+                    playerInterface.setDark(1); // 解锁阶段 1
+                    currentLock = 1; // 实时更新锁，用于后续阶段的检查
                 }
             }
 
             // --- 阶段 2: 等级 >= 30 ---
-            // 药水等级满足 30 级 **且** 锁的等级必须低于 50 才能触发
+            // 药水等级必须满足 >= 30，且锁等级必须低于 50
             if (amplifier >= 30) {
-                if (currentLock < 50) {
+                if (currentLock < 50) { // 检查是否已解锁
                     if (!playerInterface.getDarkMsg2Sent()) {
                         if (serverWorld != null) {
                             entity.sendMessage(Text.translatable("dark2").formatted(Formatting.DARK_PURPLE));
@@ -147,21 +124,48 @@ public class DarkEffect extends StatusEffect {
                         }
                         playerInterface.setDarkMsg2Sent(true);
                     }
-                    playerInterface.setDark(50); // 设置 30 级阶段锁
+                    playerInterface.setDark(50); // 解锁阶段 2
+                    currentLock = 50; // 实时更新锁
                 }
             }
 
-            // --- 阶段 1: 等级 >= 0 (基础阶段) ---
-            // 药水等级满足 0 级 **且** 锁的等级必须低于 1 才能触发
-            if (amplifier >= 0) {
-                if (currentLock < 1) {
-                    if (!playerInterface.getDarkMsg1Sent()) {
+            // --- 阶段 3: 等级 >= 70 ---
+            // 药水等级必须满足 >= 70，且锁等级必须低于 100
+            if (amplifier >= 70) {
+                if (currentLock < 100) { // 检查是否已解锁
+                    if (!playerInterface.getDarkMsg3Sent()) {
                         if (serverWorld != null) {
-                            entity.sendMessage(Text.translatable("dark1").formatted(Formatting.DARK_GRAY));
+                            entity.sendMessage(Text.translatable("dark3").formatted(Formatting.RED));
+                            giveFrenzyEffect(entity);
                         }
-                        playerInterface.setDarkMsg1Sent(true);
+                        playerInterface.setDarkMsg3Sent(true);
                     }
-                    playerInterface.setDark(1); // 设置基础阶段锁
+                    playerInterface.setDark(100); // 解锁阶段 3
+                    currentLock = 100; // 实时更新锁
+                }
+            }
+
+            // --- 阶段 4: 等级 >= 100 (致死阶段) ---
+            // 药水等级必须满足 >= 100，且锁等级必须低于 101
+            if (amplifier >= 100) {
+                if (currentLock < 101) { // 检查是否已解锁
+                    if (!playerInterface.getDarkMsg4Sent()) {
+                        if (serverWorld != null) {
+                            entity.sendMessage(Text.translatable("dark4").formatted(Formatting.GOLD));
+                        }
+                        playerInterface.setDarkMsg4Sent(true);
+                    }
+
+                    // 造成致死伤害
+                    currentDarkDamageEntry.ifPresent(damageEntry -> {
+                        DamageSource damageSource = new DamageSource(damageEntry);
+                        entity.damage(damageSource, Float.MAX_VALUE);
+                    });
+
+                    // 移除自身效果
+                    removeEffect(entity,"dark");
+
+                    playerInterface.setDark(101); // 设置最高锁
                 }
             }
         } else {
