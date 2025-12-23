@@ -28,6 +28,8 @@ public class ModItemGroups {
                         entries.add(ModArmorItems.DIVINE_CHESTPLATE);
                         entries.add(ModArmorItems.DIVINE_LEGGINGS);
                         entries.add(ModArmorItems.DIVINE_BOOTS);
+                        entries.add(ModItems.HAPPYCANDY);
+                        entries.add(ModItems.DIVINE_APPLE);
                     }).build());
 
     public static void registerModItemGroups() {

@@ -6,7 +6,7 @@ import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.datafixers.util.Pair;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
-import com.sakyrhythm.psychosis.entity.custom.PlayerEntity; // 注意这里的 PlayerEntity 可能是你的自定义实体
+import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
@@ -15,7 +15,7 @@ import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.item.ModArmorItems;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
 import com.sakyrhythm.psychosis.item.ModItems;
-import com.sakyrhythm.psychosis.mixin.PlayerMixin; // 导入 PlayerMixin
+import com.sakyrhythm.psychosis.mixin.PlayerMixin;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -64,17 +64,33 @@ import static net.minecraft.server.command.CommandManager.literal;
 public class Psychosis implements ModInitializer {
 	public static final String MOD_ID = "psychosis";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+	// ************************************************************
+	// 状态效果实例定义
+	// ************************************************************
 	public static final StatusEffect DarkEffect = new DarkEffect();
 	public static final StatusEffect VulnerableEffect = new VulnerableEffect();
 	public static final StatusEffect FrenzyEffect = new FrenzyEffect();
 	public static final StatusEffect DivineEffect = new DivineEffect();
 
-	// 注册键定义
+	// ************************************************************
+	// 状态效果 RegistryEntry 定义 (在 onInitialize 中赋值)
+	// ************************************************************
+	public static RegistryEntry<StatusEffect> DARK_EFFECT_ENTRY;
+	public static RegistryEntry<StatusEffect> VULNERABLE_EFFECT_ENTRY;
+	public static RegistryEntry<StatusEffect> FRENZY_EFFECT_ENTRY;
+	public static RegistryEntry<StatusEffect> DIVINE_EFFECT_ENTRY;
+
+	// ************************************************************
+	// 伤害注册键定义
+	// ************************************************************
 	public static final RegistryKey<DamageType> DARK_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "dark"));
 	public static final RegistryKey<DamageType> SHADOW_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "shadow"));
 	public static final RegistryKey<DamageType> FRENZY_DAMAGE = RegistryKey.of(RegistryKeys.DAMAGE_TYPE, Identifier.of(MOD_ID, "frenzy"));
 
-	// 自定义定位命令所需常量
+	// ************************************************************
+	// 结构定位常量
+	// ************************************************************
 	public static final Identifier DARK_STRUCTURE_ID = Identifier.of(MOD_ID, "dark");
 	public static final RegistryKey<Structure> DARK_STRUCTURE_KEY = RegistryKey.of(RegistryKeys.STRUCTURE, DARK_STRUCTURE_ID);
 
@@ -82,7 +98,9 @@ public class Psychosis implements ModInitializer {
 			new DynamicCommandExceptionType((id) -> Text.translatable("commands.locate.structure.not_found", id));
 	private static final int LOCATE_STRUCTURE_RADIUS = 100;
 
-	// 用于存储和管理延迟卸载任务的静态列表和任务类
+	// ************************************************************
+	// 强制区块卸载任务管理
+	// ************************************************************
 	private static final List<ForcedChunkTask> CHUNK_UNLOAD_TASKS = new ArrayList<>();
 
 	public static class ForcedChunkTask {
@@ -98,7 +116,9 @@ public class Psychosis implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		// 永久注册 Tick 事件监听器来处理所有延迟卸载任务
+		// ************************************************************
+		// 服务器 Tick 事件: 处理延迟卸载任务
+		// ************************************************************
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			// 使用 removeIf 迭代器进行安全移除
 			CHUNK_UNLOAD_TASKS.removeIf(task -> {
@@ -116,20 +136,42 @@ public class Psychosis implements ModInitializer {
 			});
 		});
 
+		// ************************************************************
+		// 实体注册与属性注册
+		// ************************************************************
 		FabricDefaultAttributeRegistry.register(ModEntities.PLAYER, PlayerEntity.createPlayerAttributes());
 		FabricDefaultAttributeRegistry.register(ModEntities.DEGENERATEWITHER, PlayerEntity.createPlayerAttributes());
 
-		ModItems.registerModItems();
-		ModArmorItems.registerModItems();
-		ModItemGroups.registerModItemGroups();
-		ModBlocks.registerModBlocks();
-		ModEntities.registerAttributes();
-
+		// ************************************************************
+		// 状态效果注册
+		// ************************************************************
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "dark"), DarkEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "vulnerable"), VulnerableEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "frenzy"), FrenzyEffect);
 		Registry.register(Registries.STATUS_EFFECT, Identifier.of(MOD_ID, "divine"), DivineEffect);
 
+		// ************************************************************
+		// 状态效果 RegistryEntry 赋值 (必须在注册之后)
+		// ************************************************************
+		DARK_EFFECT_ENTRY = Registries.STATUS_EFFECT.getEntry(DarkEffect);
+		VULNERABLE_EFFECT_ENTRY = Registries.STATUS_EFFECT.getEntry(VulnerableEffect);
+		FRENZY_EFFECT_ENTRY = Registries.STATUS_EFFECT.getEntry(FrenzyEffect);
+		DIVINE_EFFECT_ENTRY = Registries.STATUS_EFFECT.getEntry(DivineEffect);
+		LOGGER.info("Registered all custom StatusEffect entries.");
+
+
+		// ************************************************************
+		// 物品、方块注册
+		// ************************************************************
+		ModItems.registerModItems();
+		ModArmorItems.registerModItems();
+		ModItemGroups.registerModItemGroups();
+		ModBlocks.registerModBlocks();
+		ModEntities.registerAttributes(); // 实体属性注册已在前文完成，这里只是调用确保其他属性被注册
+
+		// ************************************************************
+		// 服务器启动事件：检查 DamageType 注册
+		// ************************************************************
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			Optional<RegistryEntry.Reference<DamageType>> checkEntry = server.getRegistryManager()
 					.get(RegistryKeys.DAMAGE_TYPE)
@@ -142,6 +184,9 @@ public class Psychosis implements ModInitializer {
 			}
 		});
 
+		// ************************************************************
+		// 方块交互事件：追踪 DARK_BLOCK 放置
+		// ************************************************************
 		UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
 			if (world.isClient() || !(world instanceof ServerWorld serverWorld)) {
 				return ActionResult.PASS;
@@ -163,6 +208,9 @@ public class Psychosis implements ModInitializer {
 			return ActionResult.PASS;
 		});
 
+		// ************************************************************
+		// 方块攻击事件：追踪 DARK_BLOCK 破坏
+		// ************************************************************
 		AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
 			if (world.isClient() || hand != Hand.MAIN_HAND || !(world instanceof ServerWorld serverWorld)) {
 				return ActionResult.PASS;
@@ -179,7 +227,9 @@ public class Psychosis implements ModInitializer {
 			return ActionResult.PASS;
 		});
 
-		// 区块加载事件，用于追踪旧世界和重启服务器后加载的 DARK_BLOCK
+		// ************************************************************
+		// 区块加载事件：追踪旧世界和重启后的 DARK_BLOCK
+		// ************************************************************
 		ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
 			if (!(world instanceof ServerWorld serverWorld)) {
 				return;
@@ -210,10 +260,9 @@ public class Psychosis implements ModInitializer {
 			}
 		});
 
-		// =========================================================================
-		// *** 命令注册 ***
-		// =========================================================================
-
+		// ************************************************************
+		// 命令注册
+		// ************************************************************
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(literal("psychosis")
 					// 1. 测试伤害命令
@@ -228,9 +277,11 @@ public class Psychosis implements ModInitializer {
 								}
 								DamageSource damageSource = player.getDamageSources().generic();
 								try {
+									// 强制转换为 Mixin 接口
 									IPlayerEntity playerInterface = (IPlayerEntity) player;
 									playerInterface.setNoticed(true);
 									for (int i = 0; i < 10; i++) {
+										// 玩家伤害，注意这里使用了 generic 伤害类型
 										player.damage(damageSource, 1.0f);
 										player.sendMessage(Text.literal("造成伤害 #" + (i + 1)), false);
 									}
@@ -250,7 +301,7 @@ public class Psychosis implements ModInitializer {
 									.executes(context -> executeLocateDarkStructure(context.getSource()))
 							)
 					)
-					// 3. ⭐ 新增查询 DarkEffect 状态命令
+					// 3. 查询 DarkEffect 状态命令
 					.then(literal("status")
 							.then(literal("dark")
 									.requires((source) -> source.hasPermissionLevel(0))
@@ -289,6 +340,9 @@ public class Psychosis implements ModInitializer {
 		});
 	}
 
+	// ************************************************************
+	// 强制加载和延迟卸载辅助方法 (在玩家被“察觉”时调用)
+	// ************************************************************
 	public static void forceAndScheduleUnload(ServerWorld world, BlockPos pos) {
 
 		Registry<Structure> structureRegistry = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
@@ -334,6 +388,9 @@ public class Psychosis implements ModInitializer {
 				MathHelper.floor(getHorizontalDistance(currentPos.getX(), currentPos.getZ(), resultPos.getX(), resultPos.getZ())));
 	}
 
+	// ************************************************************
+	// 定位 Dark Structure 命令执行逻辑
+	// ************************************************************
 	private int executeLocateDarkStructure(ServerCommandSource source) throws CommandSyntaxException {
 		Registry<Structure> structureRegistry = source.getWorld().getRegistryManager().get(RegistryKeys.STRUCTURE);
 
@@ -387,6 +444,10 @@ public class Psychosis implements ModInitializer {
 			return distance;
 		}
 	}
+
+	// ************************************************************
+	// 距离计算辅助方法
+	// ************************************************************
 	private static float getHorizontalDistance(int x1, int y1, int x2, int y2) {
 		int i = x2 - x1;
 		int j = y2 - y1;

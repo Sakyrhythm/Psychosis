@@ -101,7 +101,6 @@ public abstract class PlayerMixin implements IPlayerEntity {
         // 【死亡时清除逻辑】
         if (player.getHealth() <= 0.0F) {
             if (!player.getWorld().isClient()) {
-                Psychosis.LOGGER.info("Player {} health is zero. Executing full psychosis state reset.", player.getName().getString());
                 playerInterface.setDark(0);
                 playerInterface.setNoticed(false);
                 playerInterface.setDarkMsg1Sent(false);

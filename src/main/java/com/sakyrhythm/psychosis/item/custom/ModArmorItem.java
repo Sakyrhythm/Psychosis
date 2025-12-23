@@ -83,14 +83,24 @@ public class ModArmorItem extends ArmorItem {
         // 3. 移除基础效果
         for (StatusEffectInstance effect : effects) {
             RegistryEntry<StatusEffect> effectType = effect.getEffectType();
-            if (effectType != null && player.hasStatusEffect(effectType)) {
-                player.removeStatusEffect(effectType);
+            if (effectType != null) {
+                StatusEffectInstance existingEffect = player.getStatusEffect(effectType);
+
+                // 仅移除持续时间为无限的基础效果
+                if (existingEffect != null && existingEffect.isInfinite()) {
+                    player.removeStatusEffect(effectType);
+                }
             }
         }
 
-        // 4. 移除自定义 divine 效果
-        if (divineEffectEntry != null && player.hasStatusEffect(divineEffectEntry)) {
-            player.removeStatusEffect(divineEffectEntry);
+        // 4. 移除自定义 divine 效果 (仅移除无限时间的效果)
+        if (divineEffectEntry != null) {
+            StatusEffectInstance existingDivine = player.getStatusEffect(divineEffectEntry);
+
+            // ⭐ 检查：如果玩家身上有 Divine 效果，并且它是无限持续时间 (isInfinite() == true)
+            if (existingDivine != null && existingDivine.isInfinite()) {
+                player.removeStatusEffect(divineEffectEntry);
+            }
         }
     }
 
