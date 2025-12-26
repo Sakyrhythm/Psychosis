@@ -6,6 +6,7 @@
     "BrewingRecipeRegistryMixin",
     "ChunkGeneratorMixin",
     "LivingEntityMixin",
+    "PlayerInventoryMixin",
     "PlayerMixin",
     "PowderSnowBlockMixin",
     "StatusEffectInstanceMixin"

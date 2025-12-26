@@ -89,10 +89,6 @@ public abstract class LivingEntityMixin implements ILivingEntity {
         this.psychopomp$lastDarkDamageTime = ticks;
     }
 
-    @Unique
-    @Mutable
-    public int timeUntilRegen;
-
     // --- 新增：限制抗性提升等级的 Mixin ---
     // 拦截 addStatusEffect 方法，修改传入的 StatusEffectInstance
     @ModifyVariable(
@@ -145,6 +141,34 @@ public abstract class LivingEntityMixin implements ILivingEntity {
             this.psychosis_template_1_21$setLastAttacker(attacker);
         }
     }
+    @Inject(method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z", at = @At("HEAD"))
+    private void forceClearRegenTime(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        LivingEntity entity = (LivingEntity) (Object) this;
+
+        // 1. 获取 ILivingEntity 接口实例
+        if (entity instanceof ILivingEntity iLivingEntity) {
+
+            // 2. 检查是否有 Divine 效果（防止误伤）
+            RegistryEntry<StatusEffect> divineEffectEntry = entity.getWorld()
+                    .getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "divine")))
+                    .orElse(null);
+
+            boolean hasDivineEffect = (divineEffectEntry != null && entity.hasStatusEffect(divineEffectEntry));
+
+            // 3. 执行判断逻辑
+            if (iLivingEntity.psychosis_template_1_21$getCBHurt() && !hasDivineEffect) {
+                // 如果满足条件（有 cbhurt 且没有 Divine），则在伤害计算前强制将无敌帧设为 0
+                // 这样即使原版逻辑依赖 timeUntilRegen，也会被忽略
+                entity.timeUntilRegen = 0;
+
+                // 提示：你可能需要确保 damage 内部的逻辑不会因为 timeUntilRegen=0 而提前退出
+                // 幸运的是，LivingEntity#damage 方法通常是在内部判断 timeUntilRegen > 0 才跳过伤害的。
+                // 强制设置为 0 应该能确保伤害处理继续。
+            }
+        }
+    }
 
     @Redirect(
             method = "damage(Lnet/minecraft/entity/damage/DamageSource;F)Z",
@@ -186,6 +210,10 @@ public abstract class LivingEntityMixin implements ILivingEntity {
         RegistryEntry<StatusEffect> darkEffectEntry = player.getWorld().getRegistryManager()
                 .get(RegistryKeys.STATUS_EFFECT)
                 .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "dark")))
+                .orElse(null);
+        RegistryEntry<StatusEffect> divineEffectEntry = player.getWorld().getRegistryManager()
+                .get(RegistryKeys.STATUS_EFFECT)
+                .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "divine")))
                 .orElse(null);
 
         if (darkEffectEntry != null && !player.hasStatusEffect(darkEffectEntry)) {

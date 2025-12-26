@@ -213,11 +213,7 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
                 this.discard();
             }
         }
-
-        // 注意：命中检测由 super.tick() 内部处理
     }
-
-    // *** 修正后的 onEntityHit 方法 ***
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
         if (this.getWorld().isClient()) return;
@@ -229,30 +225,29 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
 
             // --- 伤害增强逻辑 ---
 
-            // 1. 通过注册表获取药水效果实例
-            net.minecraft.entity.effect.StatusEffect darkPowerEffect =
-                    net.minecraft.registry.Registries.STATUS_EFFECT.get(DARK_EFFECT_KEY);
+            // 1. 确保效果注册入口不为空
+            if (darkEffectEntry != null) {
 
-            if (darkPowerEffect != null && shooter.hasStatusEffect(darkEffectEntry)) {
+                // 2. 检查玩家是否拥有该效果
+                if (shooter.hasStatusEffect(darkEffectEntry)) {
 
-                net.minecraft.entity.effect.StatusEffectInstance effectInstance = shooter.getStatusEffect(darkEffectEntry);
+                    net.minecraft.entity.effect.StatusEffectInstance effectInstance = shooter.getStatusEffect(darkEffectEntry);
 
-                if (effectInstance != null) {
-                    // 等级从 0 开始计数，因此 level = amplifier + 1
-                    int amplifier = effectInstance.getAmplifier();
-                    int effectLevel = amplifier + 1;
+                    if (effectInstance != null) {
+                        // 等级从 0 开始计数，因此 level = amplifier + 1
+                        int amplifier = effectInstance.getAmplifier();
+                        int effectLevel = amplifier + 1;
 
-                    // 计算增强伤害：每层药水效果，伤害值 + 3.0F
-                    finalDamage += effectLevel * 3.0F;
-                    LOGGER.info("Dark Power detected (Level {}). Damage increased to {}." , effectLevel, finalDamage);
+                        // 计算增强伤害：每层药水效果，伤害值 + 3.0F
+                        finalDamage += effectLevel * 3.0F;
+                        LOGGER.info("Dark Power detected (Level {}). Damage increased to {}." , effectLevel, finalDamage);
+                    }
                 }
             }
             // --- 结束伤害增强逻辑 ---
 
-
+            // ... (后续伤害和锚定逻辑保持不变) ...
             DamageSource src = this.getDamageSources().arrow(this, shooter);
-
-            // 使用计算后的最终伤害值
             livingTarget.damage(src, finalDamage);
 
             if (!this.launcherStack.isEmpty()) {

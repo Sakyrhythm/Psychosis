@@ -1,10 +1,10 @@
 package com.sakyrhythm.psychosis.entity;
 
 import com.sakyrhythm.psychosis.Psychosis;
-// import com.sakyrhythm.psychosis.entity.custom.BulletEntity; // <-- 移除不存在的导入
 import com.sakyrhythm.psychosis.entity.custom.DWitherEntity;
 import com.sakyrhythm.psychosis.entity.custom.EyeOfDarkEntity;
-import com.sakyrhythm.psychosis.entity.custom.DarkDartProjectile; // <-- 确保 DarkDartProjectile 导入正确
+import com.sakyrhythm.psychosis.entity.custom.DarkDartProjectile;
+import com.sakyrhythm.psychosis.entity.custom.FlatDartProjectile; // <-- 【新增】导入新的实体类
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EntityDimensions;
@@ -25,17 +25,31 @@ public class ModEntities {
     public static final EntityType<DarkDartProjectile> DARK_DART_PROJECTILE = Registry.register(
             Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID, "dark_dart_projectile"),
-            // 使用 MISC 组，因为它是投掷物
             EntityType.Builder.<DarkDartProjectile>create(DarkDartProjectile::new, SpawnGroup.MISC)
-                    // 投掷物尺寸
                     .dimensions(0.5F, 0.5F)
-                    .maxTrackingRange(8) // 提高追踪范围以适应极速
+                    .maxTrackingRange(8)
                     .trackingTickInterval(1)
                     .build()
     );
 
     // =========================================================================================
-    // 您已有的注册
+    // 【新增】FlatDartProjectile 实体注册 (扁平平面剑气投掷物)
+    // =========================================================================================
+
+    public static final EntityType<FlatDartProjectile> FLAT_DART = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "flat_dart"),
+            EntityType.Builder.<FlatDartProjectile>create(FlatDartProjectile::new, SpawnGroup.MISC)
+                    // 尺寸调整：使其非常扁平，以匹配渲染器的平面效果
+                    .dimensions(0.5F, 0.05F)
+                    .maxTrackingRange(16)
+                    .trackingTickInterval(1)
+                    .build()
+    );
+
+
+    // =========================================================================================
+    // 您已有的注册 (保持不变)
     // =========================================================================================
 
     public static final EntityType<EyeOfDarkEntity> EYE_OF_DARK = Registry.register(
@@ -47,7 +61,7 @@ public class ModEntities {
                     .trackingTickInterval(10)
                     .build()
     );
-
+    // ... (PlayerEntity 和 DEGENERATEWITHER 注册保持不变) ...
     public static final EntityType<PlayerEntity> PLAYER = Registry.register(Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID, "player"),
             EntityType.Builder.create(PlayerEntity::new, SpawnGroup.CREATURE)
@@ -70,7 +84,7 @@ public class ModEntities {
                     .build());
 
     // =========================================================================================
-    // 属性和初始化
+    // 属性和初始化 (保持不变)
     // =========================================================================================
 
     public static void registerAttributes() {

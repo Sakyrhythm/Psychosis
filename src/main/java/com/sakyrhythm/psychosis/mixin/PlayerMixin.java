@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Optional; // 导入 Optional 用于封装结果
+import java.util.Optional;
 
 @SuppressWarnings({"AddedMixinMembersNamePattern", "DataFlowIssue"})
 @Mixin(PlayerEntity.class)
@@ -42,7 +42,7 @@ public abstract class PlayerMixin implements IPlayerEntity {
     @Unique private boolean darkMsg3Sent = false;
     @Unique private boolean darkMsg4Sent = false;
 
-    // --- IPlayerEntity 接口实现 ---
+    // --- IPlayerEntity 接口实现 (保持不变) ---
     @Unique @Override public void setDark(int dark) { this.dark = dark; }
     @Unique @Override public int getDark() { return this.dark; }
     @Unique @Override public void setNoticed(boolean noticed) { this.noticed = noticed; }
@@ -57,13 +57,8 @@ public abstract class PlayerMixin implements IPlayerEntity {
     @Unique @Override public boolean getDarkMsg4Sent() { return this.darkMsg4Sent; }
 
     // ==========================================================
-    // ⭐ 新增查询方法：查询 DarkEffect 详情
+    // ⭐ 新增查询方法：查询 DarkEffect 详情 (保持不变)
     // ==========================================================
-    /**
-     * 查询当前玩家身上的 DarkEffect 实例。
-     * 仅在服务器端有效。
-     * @return 如果找到 DarkEffect，返回 Optional<StatusEffectInstance>；否则返回 Optional.empty()。
-     */
     @Unique
     public Optional<StatusEffectInstance> queryDarkEffectInstance() {
         PlayerEntity player = (PlayerEntity) (Object) this;
@@ -73,16 +68,11 @@ public abstract class PlayerMixin implements IPlayerEntity {
             return Optional.empty();
         }
 
-        // 使用 getStatusEffect(RegistryEntry<StatusEffect>) 方法来安全查询
         StatusEffectInstance instance = player.getStatusEffect(darkEffectEntryCache);
 
         return Optional.ofNullable(instance);
     }
 
-    /**
-     * 查询 DarkEffect 的等级 (Amplifier + 1) 和剩余时间 (Duration in ticks)。
-     * @return 一个数组：[等级, 剩余时间 (ticks)]。如果不存在，返回 [0, 0]。
-     */
     @Unique
     public int[] queryDarkEffectInfo() {
         return queryDarkEffectInstance().map(instance ->
@@ -101,19 +91,20 @@ public abstract class PlayerMixin implements IPlayerEntity {
         // 【死亡时清除逻辑】
         if (player.getHealth() <= 0.0F) {
             if (!player.getWorld().isClient()) {
-                playerInterface.setDark(0);
-                playerInterface.setNoticed(false);
-                playerInterface.setDarkMsg1Sent(false);
-                playerInterface.setDarkMsg2Sent(false);
-                playerInterface.setDarkMsg3Sent(false);
-                playerInterface.setDarkMsg4Sent(false);
+                resetPsychosisState(playerInterface);
             }
             return;
         }
 
         // 仅在服务器端处理逻辑
         if (!player.getWorld().isClient()) {
-            // ... (现有的 noticed 状态和区块加载逻辑保持不变) ...
+
+            // --- 效果注册项加载和缓存 (优化: 如果未加载，尝试加载) ---
+            if (darkEffectEntryCache == null) {
+                loadEffectRegistryEntries(player);
+            }
+
+            // --- noticed 状态和区块加载逻辑 (保持不变) ---
             if (this.noticed && !this.previousNoticed) {
                 if (player.getWorld() instanceof ServerWorld serverWorld) {
                     Psychosis.forceAndScheduleUnload(serverWorld, player.getBlockPos());
@@ -122,60 +113,84 @@ public abstract class PlayerMixin implements IPlayerEntity {
             }
             this.previousNoticed = this.noticed;
 
-            // --- 效果注册项加载和缓存 (确保在 Tick 中能获取到 RegistryEntry) ---
-            if (darkEffectEntryCache == null) {
-                darkEffectEntryCache = player.getWorld().getRegistryManager()
-                        .get(RegistryKeys.STATUS_EFFECT)
-                        .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "dark")))
-                        .orElse(null);
-            }
-            if (frenzyEffectEntryCache == null) {
-                frenzyEffectEntryCache = player.getWorld().getRegistryManager()
-                        .get(RegistryKeys.STATUS_EFFECT)
-                        .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "frenzy")))
-                        .orElse(null);
-            }
-            if (vulnerableEffectEntryCache == null) {
-                vulnerableEffectEntryCache = player.getWorld().getRegistryManager()
-                        .get(RegistryKeys.STATUS_EFFECT)
-                        .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "vulnerable")))
-                        .orElse(null);
-            }
+            // --- 核心逻辑: 检查 DarkEffect 依赖并重置状态 ---
+            if (darkEffectEntryCache != null) {
 
+                boolean hasDarkEffect = player.hasStatusEffect(darkEffectEntryCache);
 
-            // --- 现有 dark 效果清除逻辑 ---
-            if (darkEffectEntryCache != null && !player.hasStatusEffect(darkEffectEntryCache)) {
-                // 如果 DarkEffect 消失，重置所有状态
-                playerInterface.setDark(0);
-                playerInterface.setNoticed(false);
-                playerInterface.setDarkMsg1Sent(false);
-                playerInterface.setDarkMsg2Sent(false);
-                playerInterface.setDarkMsg3Sent(false);
-                playerInterface.setDarkMsg4Sent(false);
-            }
-
-            // --- 核心逻辑: 检查 DarkEffect 依赖并移除 Frenzy 和 Vulnerable ---
-            if (darkEffectEntryCache != null && !player.hasStatusEffect(darkEffectEntryCache)) {
-
-                boolean removedFrenzy = false;
-                boolean removedVulnerable = false;
-
-                if (frenzyEffectEntryCache != null && player.hasStatusEffect(frenzyEffectEntryCache)) {
-                    player.removeStatusEffect(frenzyEffectEntryCache);
-                    removedFrenzy = true;
+                if (!hasDarkEffect) {
+                    // DarkEffect 消失：执行清除和移除依赖效果
+                    handleDarkEffectRemoval(player, playerInterface);
                 }
-
-                if (vulnerableEffectEntryCache != null && player.hasStatusEffect(vulnerableEffectEntryCache)) {
-                    player.removeStatusEffect(vulnerableEffectEntryCache);
-                    removedVulnerable = true;
-                }
-
-                if (removedFrenzy || removedVulnerable) {
-                    Psychosis.LOGGER.debug("Player {} 失去了 DarkEffect，依赖效果（Frenzy/Vulnerable）已被移除。", player.getName().getString());
-                }
-            } else if (darkEffectEntryCache == null && player.getWorld().getTime() % 200 == 0) {
+            } else if (player.getWorld().getTime() % 200 == 0) {
                 Psychosis.LOGGER.warn("无法在 PlayerMixin 中找到 DarkEffect 的 RegistryEntry。依赖检查无法执行。");
             }
+        }
+    }
+
+    // ==========================================================
+    // --- 辅助方法 ---
+
+    /**
+     * 重置所有与 Psychosis 相关的自定义状态。
+     */
+    @Unique
+    private void resetPsychosisState(IPlayerEntity playerInterface) {
+        playerInterface.setDark(0);
+        playerInterface.setNoticed(false);
+        playerInterface.setDarkMsg1Sent(false);
+        playerInterface.setDarkMsg2Sent(false);
+        playerInterface.setDarkMsg3Sent(false);
+        playerInterface.setDarkMsg4Sent(false);
+    }
+
+    /**
+     * 当 DarkEffect 消失时，移除依赖效果并重置所有状态。
+     */
+    @Unique
+    private void handleDarkEffectRemoval(PlayerEntity player, IPlayerEntity playerInterface) {
+        // 1. 重置所有状态
+        resetPsychosisState(playerInterface);
+
+        // 2. 移除依赖效果
+        boolean removedFrenzy = false;
+        boolean removedVulnerable = false;
+
+        if (frenzyEffectEntryCache != null && player.hasStatusEffect(frenzyEffectEntryCache)) {
+            player.removeStatusEffect(frenzyEffectEntryCache);
+            removedFrenzy = true;
+        }
+
+        if (vulnerableEffectEntryCache != null && player.hasStatusEffect(vulnerableEffectEntryCache)) {
+            player.removeStatusEffect(vulnerableEffectEntryCache);
+            removedVulnerable = true;
+        }
+
+        if (removedFrenzy || removedVulnerable) {
+            Psychosis.LOGGER.debug("Player {} 失去了 DarkEffect，依赖效果（Frenzy/Vulnerable）已被移除。", player.getName().getString());
+        }
+    }
+
+    /**
+     * 尝试加载并缓存 StatusEffect 的 RegistryEntry。
+     */
+    @Unique
+    private void loadEffectRegistryEntries(PlayerEntity player) {
+        if (player.getWorld() instanceof ServerWorld serverWorld) {
+            darkEffectEntryCache = serverWorld.getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "dark")))
+                    .orElse(null);
+
+            frenzyEffectEntryCache = serverWorld.getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "frenzy")))
+                    .orElse(null);
+
+            vulnerableEffectEntryCache = serverWorld.getRegistryManager()
+                    .get(RegistryKeys.STATUS_EFFECT)
+                    .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "vulnerable")))
+                    .orElse(null);
         }
     }
 }
