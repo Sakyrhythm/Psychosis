@@ -30,6 +30,7 @@ public class ModItemGroups {
                         entries.add(ModArmorItems.DIVINE_BOOTS);
                         entries.add(ModItems.HAPPYCANDY);
                         entries.add(ModItems.DIVINE_APPLE);
+                        entries.add(ModItems.DARKSWORD);
                     }).build());
 
     public static void registerModItemGroups() {

@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
 import net.minecraft.client.model.Dilation;
 import net.minecraft.client.model.TexturedModelData;
+import net.minecraft.client.render.entity.FlyingItemEntityRenderer;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.WitherEntityRenderer;
 
@@ -30,7 +31,8 @@ public class PsychosisModClient implements ClientModInitializer {
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);
         EntityRendererRegistry.register(ModEntities.EYE_OF_DARK, EyeOfDarkRenderer::new);
         EntityRendererRegistry.register(ModEntities.DEGENERATEWITHER, DWitherEntityRenderer::new);
-
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.DARK_DART,DarkDartModel::getTexturedModelData);
+        EntityRendererRegistry.register(ModEntities.DARK_DART_PROJECTILE,DarkDartRenderer::new);
         // 3. 关键一步：将你的单头模型数据注册到自定义的模型层上
         EntityModelLayerRegistry.registerModelLayer(
                 ModModelLayers.MODEL_DEGENERATE_WITHER_LAYER,
