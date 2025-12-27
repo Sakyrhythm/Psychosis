@@ -1,7 +1,9 @@
 package com.sakyrhythm.psychosis.item;
 
+import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.custom.DarkDartProjectile;
 import com.sakyrhythm.psychosis.entity.custom.FlatDartProjectile;
+import com.sakyrhythm.psychosis.entity.custom.WhirlwindSlashEntity;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.Entity;
@@ -10,12 +12,15 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.damage.DamageSources;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.*;
 import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
@@ -26,11 +31,15 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -38,15 +47,19 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 // 假设 ModToolMaterials 存在且已导入
-// 注意：FlatDartProjectile, DarkDartProjectile, ModToolMaterials 需要您自行定义
-
 public class DarkSwordItem extends SwordItem {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("DarkSword");
 
+    private static final RegistryKey<StatusEffect> DARK_EFFECT_KEY = RegistryKey.of(
+            RegistryKeys.STATUS_EFFECT,
+            net.minecraft.util.Identifier.of(Psychosis.MOD_ID, "dark")
+    );
+    RegistryEntry<StatusEffect> darkEffectEntry = Registries.STATUS_EFFECT
+            .getEntry(DARK_EFFECT_KEY)
+            .orElse(null);
     // --- NBT 锚点常量 ---
     private static final String ANCHOR_TAG = "DarkSwordAnchor";
     private static final String HAS_ANCHOR_KEY = "HasAnchor";
@@ -59,13 +72,19 @@ public class DarkSwordItem extends SwordItem {
 
     // --- 属性修改器常量 (扣除生命值上限) ---
     private static final Identifier MAX_HEALTH_MODIFIER_ID = Identifier.of("psychosis", "dark_sword_anchor_health");
-    private static final UUID MAX_HEALTH_MODIFIER_UUID = UUID.fromString("9D13028C-519A-40B3-B549-F6A22B96102A");
-    // 使用 ADD_MULTIPLIED_TOTAL 操作，这里的值 -0.5 意味着生命值上限降低 50%
     private static final double MAX_HEALTH_MODIFIER_VALUE = -0.5;
-    // FlatDart 基础伤害
-    private static final double BASE_FLAT_DART_DAMAGE = 6.0;
-    // 每级黑暗缠绕为 FlatDart 增加的额外伤害
-    private static final double FLAT_DART_DAMAGE_PER_AMPLIFIER = 3.0;
+
+    // --- 圆月斩 AOE 常量 ---
+    private static final double WHIRLWIND_AOE_RANGE = 4.0;
+    private static final float WHIRLWIND_BASE_DAMAGE = 12.0f; // 【修正：基础伤害 12.0f】
+    private static final float DARKDART_BASE_DAMAGE = 15.0f; // 【修正：基础伤害 12.0f】
+    private static final float DARKDART_DAMAGE_PER_AMPLIFIER = 3.0f; // 【新增：每级黑暗纠缠 2.0f】
+    private static final float WHIRLWIND_DAMAGE_MULTIPLIER = 0.5f;
+    private static final float WHIRLWIND_DAMAGE_PER_AMPLIFIER = 2.0f; // 【新增：每级黑暗纠缠 2.0f】
+
+    // 黑暗纠缠状态效果的 Identifier，用于获取等级
+    private static final Identifier DARK_EFFECT_ID = Identifier.of("psychosis", "dark");
+
 
     public DarkSwordItem(Settings settings) {
         // 假设 ModToolMaterials.DARK 在您的项目中已定义
@@ -73,7 +92,7 @@ public class DarkSwordItem extends SwordItem {
     }
 
     // =========================================================================================
-    // 属性修改器管理方法
+    // 属性修改器管理方法 (保持不变)
     // =========================================================================================
 
     private static void applyMaxHealthModifier(PlayerEntity player) {
@@ -112,7 +131,7 @@ public class DarkSwordItem extends SwordItem {
     }
 
     // =========================================================================================
-    // NBT 辅助方法
+    // NBT 辅助方法 (保持不变)
     // =========================================================================================
 
     @Nullable
@@ -139,9 +158,6 @@ public class DarkSwordItem extends SwordItem {
 
     /**
      * 解除锚定，同步属性，可选恢复血量。
-     * @param stack 要修改的物品堆栈。
-     * @param player 拥有该物品的玩家。
-     * @param healthToRestore 恢复的血量值 (如果为 null 则不恢复)。
      */
     private void disengageAnchorAndSync(ItemStack stack, PlayerEntity player, @Nullable Float healthToRestore) {
         // 步骤 1: 清除当前剑的锚点 NBT
@@ -179,23 +195,14 @@ public class DarkSwordItem extends SwordItem {
         return item.isSwordAnchored(stack);
     }
 
-    /**
-     * 静态版本: 检查玩家背包中是否有锚定剑。
-     */
     public static boolean playerHasAnchoredDarkSwordStatic(PlayerEntity player) {
-        DarkSwordItem item = (DarkSwordItem) Items.IRON_SWORD; // 仅用于获取实例，假设所有 DarkSwordItem 行为一致
         // 实际的实现应该直接使用 DarkSwordItem.isSwordAnchored(stack)
-
-        // 检查主物品栏
         for (ItemStack itemStack : player.getInventory().main) {
             if (isSwordAnchoredStatic(itemStack)) {
                 return true;
             }
         }
-        // 检查副手
         if (isSwordAnchoredStatic(player.getOffHandStack())) return true;
-
-        // 检查盔甲栏
         for (ItemStack armor : player.getInventory().armor) {
             if (isSwordAnchoredStatic(armor)) {
                 return true;
@@ -204,43 +211,25 @@ public class DarkSwordItem extends SwordItem {
         return false;
     }
 
-    /**
-     * 静态版本: 移除 Max Health 修改器。
-     */
     public static void removeMaxHealthModifierStatic(PlayerEntity player) {
         removeMaxHealthModifier(player); // 调用私有/静态方法
     }
 
-    /**
-     * 【新增/通用】处理物品被玩家移除（丢弃、清除、死亡清空）时的锚定解除和血量恢复。
-     * * 此方法旨在被外部 Mixin 拦截 PlayerInventory 的清空或移除事件时调用。
-     * * @param stack 被移除的物品堆栈。
-     * @param player 物品所属的玩家。
-     */
     public static void handleSwordRemoval(ItemStack stack, PlayerEntity player) {
-        // 确保被处理的物品是 DarkSwordItem
         if (stack.getItem() instanceof DarkSwordItem darkSwordItem) {
-
-            // 确保剑是锚定状态
             if (darkSwordItem.isSwordAnchored(stack)) {
-
                 NbtCompound anchorTag = darkSwordItem.getAnchorTag(stack);
-
-                // 获取原始血量值，用于恢复
                 Float originalHealth = anchorTag != null && anchorTag.contains(ORIGINAL_HEALTH_KEY)
                         ? anchorTag.getFloat(ORIGINAL_HEALTH_KEY)
                         : null;
-
-                // 关键步骤：解除锚定，清理 NBT，并恢复血量/Max Health属性
                 darkSwordItem.disengageAnchorAndSync(stack, player, originalHealth);
-
                 LOGGER.info("{} DarkSword removed (clear/drop/death) and anchor disengaged, health restored.", player.getName().getString());
             }
         }
     }
 
     // =========================================================================================
-    // 锚点保存逻辑 (saveAnchor)
+    // 锚点保存逻辑 (saveAnchor) (保持不变)
     // =========================================================================================
 
     public static void saveAnchor(ItemStack swordStack, PlayerEntity player, Hand hand, World hitWorld, Vec3d hitPos, int entityId) {
@@ -287,14 +276,13 @@ public class DarkSwordItem extends SwordItem {
     }
 
     // =========================================================================================
-    // 物品使用逻辑 (use) - 右键
-    // ... (保持不变)
+    // 物品使用逻辑 (use) (移除飞镖冷却，实体优先锚定)
     // =========================================================================================
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
         ItemStack stack = player.getStackInHand(hand);
-        // ... (use 逻辑保持不变)
+
         if (world.isClient()) {
             player.swingHand(hand, true);
             return TypedActionResult.pass(stack);
@@ -311,21 +299,125 @@ public class DarkSwordItem extends SwordItem {
         if (anchorTag != null) {
             // --- 锚点存在：执行传送 (高冷却) ---
             teleportPlayer(stack, player, sw, anchorTag);
-            player.getItemCooldownManager().set(this, 20); // 传送冷却 (1秒)
+
+            // 【修正：冷却时间翻倍至 40 刻 (2秒)】
+            player.getItemCooldownManager().set(this, 40);
+
             player.swingHand(hand, true);
             return TypedActionResult.success(stack);
         } else {
-            // --- 锚点不存在：发射飞镖 (低冷却) ---
-            launchProjectile(sw, player, stack, hand);
-            player.getItemCooldownManager().set(this, 2); // 飞镖冷却 (0.1秒)
-            player.swingHand(hand, true);
-            return TypedActionResult.success(stack);
+            // --- 锚点不存在：执行实体/方块检测或发射飞镖 ---
+
+            final double MAX_DISTANCE = 50.0;
+
+            // 1. 手动计算射线终点
+            Vec3d playerEyePos = player.getEyePos();
+            Vec3d rotationVector = player.getRotationVector();
+            Vec3d endPos = playerEyePos.add(rotationVector.multiply(MAX_DISTANCE));
+
+            // 2. 方块射线检测 (Block Raycasting)
+            RaycastContext rayCtx = new RaycastContext(
+                    playerEyePos,
+                    endPos,
+                    RaycastContext.ShapeType.COLLIDER,
+                    RaycastContext.FluidHandling.NONE,
+                    player
+            );
+            BlockHitResult blockHit = world.raycast(rayCtx);
+
+            // 3. 实体射线检测 (Entity Raycasting) - 寻找LivingEntity
+
+            Vec3d blockHitPos = blockHit.getPos();
+
+            // 计算实体检测的最大终点：方块命中点或最大距离
+            double entityCheckDistance = blockHit.getType() != HitResult.Type.MISS
+                    ? playerEyePos.distanceTo(blockHitPos)
+                    : MAX_DISTANCE;
+
+            // 实体检测：寻找最近的 LivingEntity
+            EntityHitResult entityHit = ProjectileUtil.raycast(
+                    player,
+                    playerEyePos,
+                    playerEyePos.add(player.getRotationVector().multiply(entityCheckDistance)),
+                    player.getBoundingBox().stretch(player.getRotationVector().multiply(entityCheckDistance)).expand(1.0),
+                    (entity) -> entity instanceof LivingEntity && !entity.isSpectator() && entity.canHit(),
+                    entityCheckDistance * entityCheckDistance
+            );
+
+            // --- 目标处理与锚定 ---
+
+            if (entityHit != null) {
+                // ** 实体命中：立即锚定！**
+                Entity targetEntity = entityHit.getEntity();
+                Vec3d targetHitPos = entityHit.getPos();
+                int playerDarkLevel = getDarkEntanglementAmplifier(player); // <-- 检查玩家自身的效果
+                float darkBonusDamage = playerDarkLevel * DARKDART_DAMAGE_PER_AMPLIFIER;
+
+
+                if (targetEntity instanceof LivingEntity target) {
+                    saveAnchor(stack, player, hand, sw, targetHitPos, targetEntity.getId());
+                    // 飞镖音效 (Warden Roar) 在锚定成功时取消，只播放锚点音效
+                    //player.getItemCooldownManager().set(this, 40); // 锚定成功
+                    player.swingHand(hand, true);
+                    player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
+                            SoundEvents.BLOCK_RESPAWN_ANCHOR_SET_SPAWN,
+                            SoundCategory.PLAYERS, 1.0F, 1.0F);
+                    player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
+                            SoundEvents.ENTITY_WARDEN_ROAR,
+                            SoundCategory.PLAYERS, 1.0F, 0.8F + world.random.nextFloat() * 0.4F);
+                    float totalDamage = DARKDART_BASE_DAMAGE;
+                    if (targetEntity!= player) {
+                        // 2. 武器攻击力附加伤害 (可选)
+                        float baseAttackDamage = (float) player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+                        totalDamage += (baseAttackDamage * WHIRLWIND_DAMAGE_MULTIPLIER);
+
+                        // 3. 应用玩家自身的黑暗纠缠伤害加成
+                        totalDamage += darkBonusDamage; // <-- 使用预先计算好的加成
+                        if (darkEffectEntry != null) {
+                            // 检查目标是否已经拥有该效果
+                            if (!target.hasStatusEffect(darkEffectEntry)) { // <--- 修正: 使用 targetEntity 实例
+                                final int DURATION_TICKS = 10;
+                                final int AMPLIFIER = 0;
+
+                                target.addStatusEffect(new StatusEffectInstance( // <--- 修正: 使用 targetEntity 实例
+                                        darkEffectEntry,
+                                        DURATION_TICKS,
+                                        AMPLIFIER,
+                                        false,
+                                        false,
+                                        true
+                                ));
+                            } else {
+                                // 空的 else 块可以删除，或者添加日志
+                            }
+                        }                  // 造成伤害
+                        DamageSources damageSources = target.getWorld().getDamageSources();
+                        target.damage(damageSources.playerAttack(player), totalDamage);
+                    }
+                    return TypedActionResult.success(stack);
+                }
+            }
+
+            if (blockHit.getType() == HitResult.Type.BLOCK) {
+                // ** 方块命中：发射飞镖 (无冷却) **
+                if (playerEyePos.distanceTo(blockHitPos) > 1.0) { // 防止太近的方块误判
+                    launchProjectile(sw, player, stack, hand);
+                    // 【已移除冷却设置】
+                    player.swingHand(hand, true);
+                    return TypedActionResult.success(stack);
+                }
+            }
+
+            // 未击中有效目标 (MISS)
+            if (player instanceof ServerPlayerEntity) {
+                //player.sendMessage(Text.translatable("tooltip.psychosis.dark_sword.no_target").styled(style -> style.withColor(Formatting.RED)), true);
+            }
+            return TypedActionResult.fail(stack);
         }
     }
 
     // =========================================================================================
-    // 右键发射飞镖逻辑 (launchProjectile)
-    // ... (保持不变)
+    // 右键发射飞镖逻辑 (launchProjectile) (音效已更改)
     // =========================================================================================
     private void launchProjectile(ServerWorld world, PlayerEntity player, ItemStack stack, Hand hand) {
         if (stack.isEmpty()) return;
@@ -333,15 +425,10 @@ public class DarkSwordItem extends SwordItem {
         // 发射 DarkDartProjectile (飞镖)
         DarkDartProjectile dart = new DarkDartProjectile(world, player, stack, hand);
         world.spawnEntity(dart);
-
-        world.playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
-                SoundCategory.PLAYERS, 1.0F, 0.8F + world.random.nextFloat() * 0.4F);
     }
 
     // =========================================================================================
-    // 左键发射剑气逻辑 (launchSingleFlatProjectile)
-    // ... (保持不变)
+    // 左键发射剑气逻辑 (launchSingleFlatProjectile) (已修改音效为 ENTITY_WITHER_SHOOT)
     // =========================================================================================
 
     private void launchSingleFlatProjectile(ServerWorld world, PlayerEntity player, ItemStack stack, Hand hand) {
@@ -362,18 +449,17 @@ public class DarkSwordItem extends SwordItem {
         dart.setDamage(6.0);
         world.spawnEntity(dart);
 
+        // 【音效已更改】：使用 ENTITY_WITHER_SHOOT
         world.playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
+                SoundEvents.ENTITY_WITHER_SHOOT,
                 SoundCategory.PLAYERS, 1.0F, 0.8F + world.random.nextFloat() * 0.4F);
     }
-    // ... (launchSequentialProjectiles 已移除)
 
     // =========================================================================================
-    // 传送逻辑 (teleportPlayer) - 右键触发
-    // ... (保持不变)
+    // 传送逻辑 (teleportPlayer) - 右键触发 (音效已更改)
     // =========================================================================================
     private void teleportPlayer(ItemStack swordStack, PlayerEntity player, ServerWorld currentWorld, NbtCompound anchorTag) {
-        // ... (逻辑保持不变)
+
         float savedHealth = player.getHealth();
         boolean hasSavedHealth = anchorTag.contains(ORIGINAL_HEALTH_KEY);
         if (hasSavedHealth) {
@@ -416,14 +502,90 @@ public class DarkSwordItem extends SwordItem {
         // 执行跨维度或同维度的传送
         serverPlayer.teleport(targetWorld, x, y, z, player.getYaw(), player.getPitch());
 
-        // 声音和粒子效果
+        // 声音和粒子效果 (传送音效)
         currentWorld.playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.ENTITY_ENDER_PEARL_THROW, SoundCategory.PLAYERS, 1.0F, 0.4F);
+                SoundEvents.ENTITY_SHULKER_TELEPORT, // 传送音效保持 Shulker Teleport，因为它很独特
+                SoundCategory.PLAYERS, 1.0F, 0.4F);
 
         targetWorld.spawnParticles(
                 net.minecraft.particle.ParticleTypes.PORTAL,
                 x, y + 1.0, z, 50, 0.5, 0.5, 0.5, 0.0
         );
+        // --- 圆月斩 AOE 逻辑 ---
+
+        // 1. 【核心修正】：预先计算玩家自身的黑暗纠缠伤害加成
+        int playerDarkLevel = getDarkEntanglementAmplifier(player); // <-- 检查玩家自身的效果
+        float darkBonusDamage = playerDarkLevel * WHIRLWIND_DAMAGE_PER_AMPLIFIER;
+
+        // 2. 定义 AOE 区域 (以玩家为中心)
+        Box aoeBox = new Box(
+                x - WHIRLWIND_AOE_RANGE, y - 1.0, z - WHIRLWIND_AOE_RANGE,
+                x + WHIRLWIND_AOE_RANGE, y + 2.0, z + WHIRLWIND_AOE_RANGE
+        );
+
+        // 3. 遍历 AOE 范围内的实体
+        targetWorld.getOtherEntities(player, aoeBox, entity -> entity instanceof LivingEntity)
+                .forEach(entity -> {
+                    if (entity != player) {
+                        LivingEntity targetEntity = (LivingEntity) entity;
+
+                        // --- 伤害计算修正 ---
+                        // 1. 基础伤害 (12.0f)
+                        float totalDamage = WHIRLWIND_BASE_DAMAGE;
+
+                        // 2. 武器攻击力附加伤害 (可选)
+                        float baseAttackDamage = (float) player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+                        totalDamage += (baseAttackDamage * WHIRLWIND_DAMAGE_MULTIPLIER);
+
+                        // 3. 应用玩家自身的黑暗纠缠伤害加成
+                        totalDamage += darkBonusDamage; // <-- 使用预先计算好的加成
+                        if (darkEffectEntry != null) {
+                            // 检查目标是否已经拥有该效果
+                            if (!targetEntity.hasStatusEffect(darkEffectEntry)) { // <--- 修正: 使用 targetEntity 实例
+                                final int DURATION_TICKS = 10;
+                                final int AMPLIFIER = 0;
+
+                                targetEntity.addStatusEffect(new StatusEffectInstance( // <--- 修正: 使用 targetEntity 实例
+                                        darkEffectEntry,
+                                        DURATION_TICKS,
+                                        AMPLIFIER,
+                                        false,
+                                        false,
+                                        true
+                                ));
+                            } else {
+                                // 空的 else 块可以删除，或者添加日志
+                            }
+                        }                  // 造成伤害
+                        DamageSources damageSources = targetWorld.getDamageSources();
+                        targetEntity.damage(damageSources.playerAttack(player), totalDamage);
+
+                        // AOE 粒子效果 (可选)
+                        targetWorld.spawnParticles(
+                                ParticleTypes.CRIT,
+                                targetEntity.getX(),
+                                targetEntity.getY() + targetEntity.getHeight() / 2.0,
+                                targetEntity.getZ(),
+                                5, 0.1, 0.1, 0.1, 0.0
+                        );
+                    }
+                });
+
+        // 3. 生成圆月斩特效实体 (客户端渲染)
+        WhirlwindSlashEntity slash = new WhirlwindSlashEntity(targetWorld, player);
+
+        // 【生成位置修正】：调整 Y 轴偏移量，将特效抬高。
+        final double Y_OFFSET = 1.1f;
+
+        slash.setPos(x, y + Y_OFFSET, z); // 生成在传送后的位置，并向上抬高
+        targetWorld.spawnEntity(slash);
+
+        // AOE 成功声音 【音效已更改】
+        targetWorld.playSound(null, x, y, z,
+                SoundEvents.ENTITY_WARDEN_SONIC_BOOM, // <--- 已更改为 Warden Sonic Boom
+                SoundCategory.PLAYERS, 1.0F, 0.6F + targetWorld.random.nextFloat() * 0.4F);
+
+        // --- 圆月斩 AOE 逻辑结束 ---
 
         // 确保 NBT 清理发生在当前活跃的 ItemStack 上
         ItemStack stackToModify = player.getStackInHand(player.getActiveHand());
@@ -435,9 +597,8 @@ public class DarkSwordItem extends SwordItem {
 
 
     // =========================================================================================
-    // 左键攻击逻辑 (postHit) - 核心逻辑 (已包含施加黑暗效果和解除锚定)
+    // 左键攻击逻辑 (postHit) (保持不变)
     // =========================================================================================
-
     @Override
     public boolean postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
 
@@ -448,7 +609,7 @@ public class DarkSwordItem extends SwordItem {
             if (isAnchored) {
                 // *** 锚定状态下左键攻击 ***
 
-                // --- 1. 施加黑暗纠缠效果 (保持不变) ---
+                // --- 1. 施加黑暗纠缠效果 (添加条件检查) ---
                 RegistryKey<net.minecraft.entity.effect.StatusEffect> darkEffectKey =
                         RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "dark"));
 
@@ -456,17 +617,23 @@ public class DarkSwordItem extends SwordItem {
                         world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).getEntry(darkEffectKey);
 
                 if (darkEffectEntry.isPresent()) {
-                    final int DURATION_TICKS = 10; // 0.5 秒
-                    StatusEffectInstance darkEntanglement = new StatusEffectInstance(
-                            darkEffectEntry.get(),
-                            DURATION_TICKS,
-                            0,
-                            false,
-                            false,
-                            false
-                    );
-                    target.addStatusEffect(darkEntanglement);
-                    LOGGER.info("Applied Dark Entanglement ({} ticks) to {} due to anchored hit.", DURATION_TICKS, target.getName().getString());
+                    // 【关键修正点】：检查目标实体是否已经拥有该效果
+                    if (!target.hasStatusEffect(darkEffectEntry.get())) {
+
+                        final int DURATION_TICKS = 10; // 0.5 秒
+                        StatusEffectInstance darkEntanglement = new StatusEffectInstance(
+                                darkEffectEntry.get(),
+                                DURATION_TICKS,
+                                0, // Amplifier 0 = Level 1
+                                false,
+                                false,
+                                false
+                        );
+                        target.addStatusEffect(darkEntanglement);
+                        LOGGER.info("Applied Dark Entanglement ({} ticks) to {} due to anchored hit.", DURATION_TICKS, target.getName().getString());
+                    } else {
+                        LOGGER.info("{} already has Dark Entanglement. Skipping reapplication on postHit.", target.getName().getString());
+                    }
                 }
                 // --- 施加黑暗纠缠效果结束 ---
 
@@ -475,11 +642,6 @@ public class DarkSwordItem extends SwordItem {
                 launchSingleFlatProjectile(world, player, stack, player.getActiveHand());
 
                 // 3. 解除锚定逻辑
-                // 注意：我们仍然获取 originalHealth，但将其忽略，只传递 null 给 disengageAnchorAndSync
-                // NbtCompound anchorTag = getAnchorTag(stack);
-                // Float originalHealth = anchorTag != null && anchorTag.contains(ORIGINAL_HEALTH_KEY) ? anchorTag.getFloat(ORIGINAL_HEALTH_KEY) : null;
-
-                // 【关键修正】：传入 null 作为 healthToRestore 参数
                 disengageAnchorAndSync(stack, player, null);
                 LOGGER.info("Disengaging anchor due to attack (No health restoration).");
 
@@ -492,11 +654,15 @@ public class DarkSwordItem extends SwordItem {
         }
         return super.postHit(stack, target, attacker);
     }
+
+    // =========================================================================================
+    // 物品提示信息 (appendTooltip) (保持不变)
+    // =========================================================================================
     @Override
     public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
 
         // 只有当剑处于锚定状态时才添加信息
-        NbtCompound anchorTag = getAnchorTag(stack); // 使用现有的获取锚点NBT的方法
+        NbtCompound anchorTag = getAnchorTag(stack);
 
         if (anchorTag != null) {
 
@@ -536,8 +702,7 @@ public class DarkSwordItem extends SwordItem {
     }
 
     // =========================================================================================
-    // 物品背包检查 (inventoryTick)
-    // ... (保持不变)
+    // 物品背包检查 (inventoryTick) (保持不变)
     // =========================================================================================
 
     @Override
@@ -562,8 +727,7 @@ public class DarkSwordItem extends SwordItem {
 
 
     // =========================================================================================
-    // 辅助检查方法
-    // ... (保持不变)
+    // 辅助检查方法 (保持不变)
     // =========================================================================================
 
     private boolean hasMaxHealthModifier(PlayerEntity player) {
@@ -589,5 +753,28 @@ public class DarkSwordItem extends SwordItem {
             }
         }
         return false;
+    }
+
+    // =========================================================================================
+    // 辅助方法：获取黑暗纠缠等级 (用于圆月斩伤害计算)
+    // =========================================================================================
+
+    /**
+     * 获取目标实体身上的“黑暗纠缠”状态效果的等级 (放大器 + 1)。
+     * 在 teleportPlayer 中用于获取玩家自身的黑暗纠缠等级。
+     */
+    private int getDarkEntanglementAmplifier(LivingEntity target) {
+        // 获取注册表条目
+        Optional<RegistryEntry.Reference<StatusEffect>> darkEffectEntry =
+                target.getWorld().getRegistryManager().get(RegistryKeys.STATUS_EFFECT).getEntry(DARK_EFFECT_ID);
+
+        if (darkEffectEntry.isPresent()) {
+            StatusEffectInstance instance = target.getStatusEffect(darkEffectEntry.get());
+            if (instance != null) {
+                // 等级 = 放大器 + 1 (Level 1 是 Amplifier 0)
+                return instance.getAmplifier() + 1;
+            }
+        }
+        return 0;
     }
 }

@@ -77,7 +77,12 @@ public class DarkEyeItem extends Item {
                         dataTrackerNbt.put("useSkin", useSkinNbt);
                         customPlayer.readNbt(dataTrackerNbt);
 
-                        customPlayer.refreshPositionAndAngles(blockPos.getX() + 0.5, blockPos.getY(), blockPos.getZ() + 0.5, 0, 0);
+                        customPlayer.refreshPositionAndAngles(
+                                blockPos.getX() + 0.5,
+                                blockPos.getY() + 1.0, // 稍微抬高一点
+                                blockPos.getZ() + 0.5,
+                                0, 0
+                        );
                         serverWorld.spawnEntity(customPlayer);
 
                         LightningEntity lightning = EntityType.LIGHTNING_BOLT.create(serverWorld);
@@ -98,6 +103,24 @@ public class DarkEyeItem extends Item {
                                     searchBox,
                                     (entity) -> entity == customPlayer // 只对 customPlayer 的实体造成伤害
                             ).forEach((entity) -> entity.damage(damageSource, customDamage));
+                            if (!customPlayer.isAlive()) {
+                                net.minecraft.entity.Entity bossEntity = ModEntities.DARK_GOD.create(serverWorld);
+
+                                if (bossEntity != null) {
+                                    // 在方块中心上方生成 Boss
+                                    bossEntity.refreshPositionAndAngles(
+                                            blockPos.getX() + 0.5,
+                                            blockPos.getY() + 1.0, // 稍微抬高一点
+                                            blockPos.getZ() + 0.5,
+                                            0, 0
+                                    );
+                                    if (bossEntity instanceof com.sakyrhythm.psychosis.entity.custom.DarkGodEntity darkGod) {
+                                        darkGod.setSummoningBlockPos(blockPos);
+                                    }
+
+                                    serverWorld.spawnEntity(bossEntity);
+                                }
+                            }
                         }
                     }
                 }

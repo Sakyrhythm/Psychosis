@@ -2,8 +2,8 @@ package com.sakyrhythm.psychosis.entity.custom;
 
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.ModEntities;
-import com.sakyrhythm.psychosis.item.DarkSwordItem;
 import com.sakyrhythm.psychosis.item.ModItems;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -17,64 +17,71 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import net.minecraft.entity.Entity;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class FlatDartProjectile extends PersistentProjectileEntity {
+    private static final Logger LOGGER = LoggerFactory.getLogger("FlatDart");
+
+    // --- 常量 ---
     private static final RegistryKey<StatusEffect> DARK_EFFECT_KEY = RegistryKey.of(
             RegistryKeys.STATUS_EFFECT,
             net.minecraft.util.Identifier.of(Psychosis.MOD_ID, "dark")
     );
+    private static final float BASE_DAMAGE = 6.0F; // 基础伤害
+    private static final float DAMAGE_PER_DARK_LEVEL = 2.0F; // 每级黑暗效果提供的额外伤害
+    private static final int MAX_LIFE_TICKS = 20; // 存活时间 1 秒
+
+    // --- 状态 ---
+    private final Set<Entity> hitEntities = new HashSet<>(); // 记录已击中实体，实现单次伤害穿透
+    private int lifeTime = 0;
+
+    // 用于 Boss Counter 逻辑（未在 onEntityHit 中使用，但保留接口）
+    private boolean isBossCounter = false;
+    private float counterDamagePercent = 0.0F;
+    private int counterDarkAmplifier = 0;
+    private LivingEntity bossOwner = null;
+
+    // 效果入口缓存
     RegistryEntry<StatusEffect> darkEffectEntry = Registries.STATUS_EFFECT
             .getEntry(DARK_EFFECT_KEY)
             .orElse(null);
-    private static final float FIXED_DAMAGE = 6.0F;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("FlatDart");
+    // =================================================================================
+    // 构造函数
+    // =================================================================================
 
-    private int lifeTime = 0;
-    private static final int MAX_LIFE_TICKS = 20;
-
-    private ItemStack launcherStack = ItemStack.EMPTY;
-    private Hand handUsed = Hand.MAIN_HAND;
-
-    // 用于记录已经击中过哪些实体，防止重复伤害 (实现穿透但只伤害一次)
-    private final java.util.Set<Entity> hitEntities = new java.util.HashSet<>();
-
-    // 构造函数 1: 必须的 EntityType 构造函数
+    // 必须的 EntityType 构造函数
     public FlatDartProjectile(EntityType<? extends PersistentProjectileEntity> entityType, World world) {
         super(entityType, world);
+        this.initProjectile();
+    }
 
+    // 用于投掷的构造函数
+    public FlatDartProjectile(World world, LivingEntity shooter, ItemStack launcher, Hand hand) {
+        this(ModEntities.FLAT_DART, world);
+        this.setOwner(shooter);
+        // launcherStack 和 handUsed 可以在需要时保留，目前未使用，故省略赋值
+    }
+
+    private void initProjectile() {
         this.setNoGravity(true);
         this.setInvisible(true);
         this.pickupType = PersistentProjectileEntity.PickupPermission.DISALLOWED;
     }
 
-    // 构造函数 3: 满足 DarkSwordItem 调用的签名 (用于投掷)
-    public FlatDartProjectile(World world, LivingEntity shooter, ItemStack launcher, Hand hand) {
-        this(ModEntities.FLAT_DART, world);
-
-        this.setOwner(shooter);
-        this.launcherStack = launcher.copy();
-        this.handUsed = hand;
-
-        this.setNoGravity(true);
-        this.setInvisible(true);
-    }
-
     // =================================================================================
-    // 核心逻辑：tick() 方法
+    // 核心逻辑：tick() 方法 (穿透实现)
     // =================================================================================
 
     @Override
@@ -82,58 +89,50 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
         super.tick();
 
         if (!this.getWorld().isClient()) {
-            // 步骤 1: 计时销毁逻辑
-            lifeTime++;
-            if (lifeTime >= MAX_LIFE_TICKS) {
+            // 步骤 1: 计时销毁
+            if (++lifeTime >= MAX_LIFE_TICKS) {
                 this.discard();
                 return;
             }
 
-            // 步骤 2: 获取下一刻的位置
-            Vec3d velocity = this.getVelocity();
             Vec3d currentPos = this.getPos();
+            Vec3d velocity = this.getVelocity();
             Vec3d nextPos = currentPos.add(velocity);
 
-            // 步骤 3: 手动检测实体碰撞
+            // 步骤 2: 手动检测并处理碰撞
             EntityHitResult entityHit = this.findHitEntity(currentPos, nextPos);
 
             if (entityHit != null) {
-                // 如果是第一次击中该实体，则处理伤害
-                if (!hitEntities.contains(entityHit.getEntity())) {
-
-                    // 【关键修正点】：直接调用我们重写的方法，而不是基类的 onHit(LivingEntity)
-                    // 这样既能触发伤害逻辑，又避免了类型错误。
+                Entity target = entityHit.getEntity();
+                // 只处理第一次击中该实体的情况
+                if (!hitEntities.contains(target)) {
                     this.onEntityHit(entityHit);
-
-                    hitEntities.add(entityHit.getEntity()); // 记录已击中
+                    hitEntities.add(target);
                 }
             }
 
-            // 步骤 4: 更新位置
+            // 步骤 3: 更新位置 (实现穿透)
             this.setPos(nextPos.x, nextPos.y, nextPos.z);
         }
     }
 
-    // 自定义实体碰撞检测方法
+    // 自定义实体碰撞检测方法 (检测未击中过的实体)
     @Nullable
     protected EntityHitResult findHitEntity(Vec3d currentPos, Vec3d nextPos) {
         Vec3d delta = nextPos.subtract(currentPos);
-
+        // 搜索范围略微扩大，以捕获边缘碰撞
         Box searchBox = this.getBoundingBox().stretch(delta).expand(1.0);
 
-        // 查找范围内的所有实体
-        List<Entity> list = this.getWorld().getOtherEntities(this, searchBox, this::canHit);
+        // 查找范围内的所有实体，并排除投射物拥有者和已经击中过的实体
+        List<Entity> list = this.getWorld().getOtherEntities(this, searchBox, entity ->
+                this.canHit(entity) && !hitEntities.contains(entity)
+        );
 
         EntityHitResult closestHit = null;
         double closestDistanceSq = Double.MAX_VALUE;
 
         for (Entity entity : list) {
-            // 避免击中已经击中过的实体
-            if (hitEntities.contains(entity)) {
-                continue;
-            }
-
-            // 使用 raycast 检查投射物是否真正击中实体
+            // 使用 raycast 或包围盒相交来判断是否命中
             Optional<Vec3d> hitVec = entity.getBoundingBox().raycast(currentPos, nextPos);
 
             if (hitVec.isPresent()) {
@@ -142,99 +141,99 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
                     closestDistanceSq = distSq;
                     closestHit = new EntityHitResult(entity, hitVec.get());
                 }
-            } else if (entity.getBoundingBox().intersects(this.getBoundingBox())) {
-                // 处理实体已经包含在投射物内部的情况
-                double distSq = currentPos.squaredDistanceTo(entity.getPos());
-                if (distSq < closestDistanceSq) {
-                    closestDistanceSq = distSq;
+            }
+            // 简化：如果实体在投射物运动轨迹上的包围盒内，也视为命中（处理近距离或大体积目标）
+            else if (entity.getBoundingBox().intersects(this.getBoundingBox())) {
+                if (currentPos.squaredDistanceTo(entity.getPos()) < closestDistanceSq) {
                     closestHit = new EntityHitResult(entity);
+                    closestDistanceSq = 0.0; // 内部命中，设为最近
                 }
             }
         }
-
         return closestHit;
     }
 
-    // 覆盖 canHit，允许击中 LivingEntity
-    @Override
-    protected boolean canHit(Entity entity) {
-        if (entity == this.getOwner()) {
-            return false;
-        }
-        return entity.isAlive() && (entity instanceof LivingEntity || super.canHit(entity));
-    }
-
-
     // =================================================================================
-    // 碰撞处理：onEntityHit (正确签名)
+    // 碰撞处理：onEntityHit (剑气伤害与效果逻辑)
     // =================================================================================
-
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
         if (this.getWorld().isClient()) return;
+
         Entity target = entityHitResult.getEntity();
+        LivingEntity shooter = (LivingEntity) this.getOwner();
 
-        if (target instanceof LivingEntity livingTarget && this.getOwner() instanceof PlayerEntity shooter) {
+        // 确保目标是 LivingEntity 且拥有者存在
+        if (target instanceof LivingEntity livingTarget && shooter != null) {
 
-            float finalDamage = FIXED_DAMAGE;
+            float finalDamage = BASE_DAMAGE;
 
-            // --- 伤害增强逻辑 ---
+            // 1. 伤害增强逻辑：如果射击者是玩家且带有 'dark' 效果
+            if (shooter instanceof PlayerEntity playerShooter && darkEffectEntry != null) {
+                StatusEffectInstance effectInstance = playerShooter.getStatusEffect(darkEffectEntry);
 
-            // 1. 确保效果注册入口不为空
-            if (darkEffectEntry != null) {
-
-                // 2. 检查玩家是否拥有该效果
-                if (shooter.hasStatusEffect(darkEffectEntry)) {
-
-                    net.minecraft.entity.effect.StatusEffectInstance effectInstance = shooter.getStatusEffect(darkEffectEntry);
-
-                    if (effectInstance != null) {
-                        // 等级从 0 开始计数，因此 level = amplifier + 1
-                        int amplifier = effectInstance.getAmplifier();
-                        int effectLevel = amplifier + 1;
-
-                        // 计算增强伤害：每层药水效果，伤害值 + 3.0F
-                        finalDamage += effectLevel * 2.0F;
-                        LOGGER.info("Dark Power detected (Level {}). Damage increased to {}." , effectLevel, finalDamage);
-                    }
+                if (effectInstance != null) {
+                    int effectLevel = effectInstance.getAmplifier() + 1; // 等级 = Amplifier + 1
+                    finalDamage += effectLevel * DAMAGE_PER_DARK_LEVEL;
+                    LOGGER.info("Dark Power (Lvl {}). Damage increased to {}." , effectLevel, finalDamage);
                 }
             }
-            if (livingTarget instanceof LivingEntity livingEntity && darkEffectEntry != null) {
-                int durationTicks = 10;
-                int amplifier = 0;
 
-                livingEntity.addStatusEffect(new StatusEffectInstance(
+            // 【TODO：这里可以加入 Boss Counter 的伤害计算逻辑】
+            if (isBossCounter && target == bossOwner) {
+                // finalDamage += target.getMaxHealth() * counterDamagePercent;
+                // ... 施加更高强度的 dark 效果 ...
+            }
+
+            // 2. 施加伤害
+            // 使用 Arrow 伤害源，但来源是剑气（投射物），归属于射击者
+            DamageSource src = this.getDamageSources().arrow(this, shooter);
+            livingTarget.damage(src, finalDamage);
+
+            // 3. 施加黑暗纠缠效果（如果目标没有）
+            if (darkEffectEntry != null && !livingTarget.hasStatusEffect(darkEffectEntry)) {
+                final int DURATION_TICKS = 10;
+                final int AMPLIFIER = 0;
+
+                livingTarget.addStatusEffect(new StatusEffectInstance(
                         darkEffectEntry,
-                        durationTicks,
-                        amplifier,
+                        DURATION_TICKS,
+                        AMPLIFIER,
                         false,
                         false,
                         true
                 ));
             }
-            DamageSource src = this.getDamageSources().arrow(this, shooter);
-            livingTarget.damage(src, finalDamage);
         }
-    }
-
-    // =================================================================================
-    // 碰撞处理：onBlockHit
-    // =================================================================================
-
-    @Override
-    protected void onBlockHit(BlockHitResult blockHitResult) {
-        // 剑气击中方块后应销毁
-        LOGGER.info("FlatDart hit block, discarding.");
-        this.discard();
     }
 
     // =================================================================================
     // 其他方法
     // =================================================================================
 
+    // 覆盖 canHit，允许击中 LivingEntity (且非拥有者)
+    @Override
+    protected boolean canHit(Entity entity) {
+        if (entity == this.getOwner()) {
+            return false;
+        }
+        // 确保剑气能击中所有活着的实体
+        return entity.isAlive() && (entity instanceof LivingEntity || super.canHit(entity));
+    }
+
+    public void setupBossCounter(LivingEntity boss, float damagePercent, int darkAmplifier) {
+        this.isBossCounter = true;
+        this.bossOwner = boss;
+        this.counterDamagePercent = damagePercent;
+        this.counterDarkAmplifier = darkAmplifier;
+        // 注意：将 owner 设置为 boss 可能会影响 canHit 检查，如果 boss 是射击者，请谨慎设置
+        this.setOwner(boss);
+    }
+
     @Override
     protected ItemStack getDefaultItemStack() {
-        return new ItemStack(ModItems.VOID_ESSENCE);
+        // 返回剑气代表的物品
+        return new ItemStack(ModItems.VOID_ESSENCE); // 或您 ModItems.VOID_ESSENCE
     }
 }

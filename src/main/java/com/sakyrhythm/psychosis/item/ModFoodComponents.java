@@ -24,6 +24,7 @@ public class ModFoodComponents {
 
     public static final FoodComponent DIVINE_APPLE = new FoodComponent.Builder()
             .nutrition(10).saturationModifier(1.5f)
+            .alwaysEdible()
             .statusEffect(new StatusEffectInstance(getDivineEffectEntry(), 12000, 0), 1f)
             .statusEffect(new StatusEffectInstance(StatusEffects.SATURATION, 12000, 0), 1f)
             .build();

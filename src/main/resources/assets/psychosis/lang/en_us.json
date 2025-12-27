@@ -40,5 +40,7 @@
   "tooltip.psychosis.dark_sword.unanchored": "Blade Slumbers: Right-click a block or host to initiate the Sacrifice",
   "tooltip.psychosis.dark_sword.anchor_pos": "Locus of Spatial Nexus: X:%s Y:%s Z:%s",
   "tooltip.psychosis.dark_sword.anchor_to_entity": "Bound to: §lA Mortal Host",
-  "tooltip.psychosis.dark_sword.anchor_dim": "Echo of the Plane: %s"
+  "tooltip.psychosis.dark_sword.anchor_dim": "Echo of the Plane: %s",
+  "entity.psychosis.dark_god": "Hades' Lingering Will",
+  "entity.psychosis.goddess": "Valkyrie of the Void"
 }

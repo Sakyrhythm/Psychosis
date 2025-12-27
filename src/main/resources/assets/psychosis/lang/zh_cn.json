@@ -2,7 +2,7 @@
   "item.psychosis.void_essence": "虚空精粹",
   "item.psychosis.white_eye": "魂之瞳",
   "item.psychosis.dark_eye": "恶魔之眼",
-  "item.psychosis.happycandy": "欢愉之糖",
+  "item.psychosis.happycandy": "开心糖",
   "item.psychosis.divine_apple": "神圣果实",
   "item.psychosis.noticed_bottle": "封印之瓶",
   "item.psychosis.divine_helmet": "神圣头巾",
@@ -40,5 +40,7 @@
   "tooltip.psychosis.dark_sword.unanchored": "剑魂沉寂：右键方块/生灵进行献祭锚定",
   "tooltip.psychosis.dark_sword.anchor_pos": "空间凝视之座: X:%s Y:%s Z:%s",
   "tooltip.psychosis.dark_sword.anchor_to_entity": "锚定至：§l生灵印记",
-  "tooltip.psychosis.dark_sword.anchor_dim": "位面回响: %s"
+  "tooltip.psychosis.dark_sword.anchor_dim": "位面回响: %s",
+  "entity.psychosis.dark_god": "冥王残魂",
+  "entity.psychosis.goddess": "虚空女神"
 }

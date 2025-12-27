@@ -1,11 +1,9 @@
 package com.sakyrhythm.psychosis.entity;
 
 import com.sakyrhythm.psychosis.Psychosis;
-import com.sakyrhythm.psychosis.entity.custom.DWitherEntity;
-import com.sakyrhythm.psychosis.entity.custom.EyeOfDarkEntity;
-import com.sakyrhythm.psychosis.entity.custom.DarkDartProjectile;
-import com.sakyrhythm.psychosis.entity.custom.FlatDartProjectile; // <-- 【新增】导入新的实体类
-import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
+import com.sakyrhythm.psychosis.entity.custom.*;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
@@ -32,6 +30,7 @@ public class ModEntities {
                     .build()
     );
 
+
     // =========================================================================================
     // 【新增】FlatDartProjectile 实体注册 (扁平平面剑气投掷物)
     // =========================================================================================
@@ -47,6 +46,51 @@ public class ModEntities {
                     .build()
     );
 
+    // =========================================================================================
+    // 【新增】WHIRLWIND_SLASH_ENTITY_TYPE 实体注册 (圆月斩动画特效实体)
+    // =========================================================================================
+
+    public static final EntityType<WhirlwindSlashEntity> WHIRLWIND_SLASH_ENTITY_TYPE = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "whirlwind_slash"),
+            // 使用 MISC (杂项) SpawnGroup，因为它是一个非交互、短时间存在的特效
+            EntityType.Builder.<WhirlwindSlashEntity>create(WhirlwindSlashEntity::new, SpawnGroup.MISC)
+                    // 尺寸应设置为动画效果的预估最大范围
+                    .dimensions(3.0F, 1.5F) // 例如：水平半径 3 格，高度 1.5 格
+                    .maxTrackingRange(32) // 确保玩家在远距离也能看到特效
+                    .trackingTickInterval(1)
+                    .build()
+    );
+
+    // =========================================================================================
+// 【新增】NAIL 实体注册 (判罚之钉)
+// =========================================================================================
+
+    public static final EntityType<NailEntity> NAIL = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "nail"),
+            EntityType.Builder.<NailEntity>create(NailEntity::new, SpawnGroup.MISC)
+                    .dimensions(0.4F, 2.5F)   // 细长钉子
+                    .maxTrackingRange(32)
+                    .trackingTickInterval(1)
+                    .build()
+    );
+
+    // =========================================================================================
+// 【新增】SCYTHE_BOSS 实体注册 (镰刀Boss)
+// =========================================================================================
+
+    public static final EntityType<ScytheBossEntity> SCYTHE =
+            Registry.register(
+                    Registries.ENTITY_TYPE,
+                    Identifier.of(Psychosis.MOD_ID, "scythe"),
+                    EntityType.Builder.create(ScytheBossEntity::new, SpawnGroup.MONSTER)
+                            .dimensions(1.2f, 3.0f)
+                            .makeFireImmune()
+                            .maxTrackingRange(64)
+                            .build()
+            );
+
 
     // =========================================================================================
     // 您已有的注册 (保持不变)
@@ -61,7 +105,7 @@ public class ModEntities {
                     .trackingTickInterval(10)
                     .build()
     );
-    // ... (PlayerEntity 和 DEGENERATEWITHER 注册保持不变) ...
+
     public static final EntityType<PlayerEntity> PLAYER = Registry.register(Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID, "player"),
             EntityType.Builder.create(PlayerEntity::new, SpawnGroup.CREATURE)
@@ -83,10 +127,24 @@ public class ModEntities {
                     .maxTrackingRange(10)
                     .build());
 
-    // =========================================================================================
-    // 属性和初始化 (保持不变)
-    // =========================================================================================
-
+    public static final EntityType<DarkGodEntity> DARK_GOD =
+            Registry.register(
+                    Registries.ENTITY_TYPE,
+                    Identifier.of(Psychosis.MOD_ID, "dark_god"),
+                    EntityType.Builder.create(DarkGodEntity::new,SpawnGroup.MONSTER)
+                            .dimensions(1.5f, 3.0f)
+                            .makeFireImmune()
+                            .build()
+            );
+    public static final EntityType<GoddessEntity> GODDESS =
+            Registry.register(
+                    Registries.ENTITY_TYPE,
+                    Identifier.of(Psychosis.MOD_ID, "goddess"),
+                    EntityType.Builder.create(GoddessEntity::new,SpawnGroup.MONSTER)
+                            .dimensions(1.5f, 3.0f)
+                            .makeFireImmune()
+                            .build()
+            );
     public static void registerAttributes() {
         DefaultAttributeContainer.Builder builder = DWitherEntity.createDegenerateWitherAttributes();
 
@@ -94,6 +152,9 @@ public class ModEntities {
 
         net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry.register(
                 DEGENERATEWITHER, builder);
+        FabricDefaultAttributeRegistry.register(
+                DARK_GOD, DarkGodEntity.createDarkGodAttributes()
+        );
     }
 
     public static void registerModEntities() {

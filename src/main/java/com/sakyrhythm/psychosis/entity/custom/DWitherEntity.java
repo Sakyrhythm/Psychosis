@@ -1,6 +1,7 @@
 // DWitherEntity.java
 package com.sakyrhythm.psychosis.entity.custom;
 
+import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.item.ModItems;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -34,6 +35,7 @@ import net.minecraft.entity.ai.pathing.BirdNavigation;
 import net.minecraft.entity.ai.pathing.EntityNavigation;
 
 public class DWitherEntity extends HostileEntity implements SkinOverlayOwner, RangedAttackMob  {
+
     private static final Predicate<LivingEntity> CAN_ATTACK_PREDICATE;
     private static final TrackedData<Integer> INVUL_TIMER =
             DataTracker.registerData(DWitherEntity.class, TrackedDataHandlerRegistry.INTEGER);
@@ -200,10 +202,6 @@ public class DWitherEntity extends HostileEntity implements SkinOverlayOwner, Ra
         this.targetSelector.add(2, new ActiveTargetGoal<>(this, LivingEntity.class, 0, false, false, CAN_ATTACK_PREDICATE));
     }
 
-    static {
-        CAN_ATTACK_PREDICATE = (entity) -> !entity.getType().isIn(EntityTypeTags.WITHER_FRIENDS) && entity.isMobOrPlayer();
-    }
-
     @Override
     public boolean shouldRenderOverlay() {
         return false;
@@ -212,5 +210,13 @@ public class DWitherEntity extends HostileEntity implements SkinOverlayOwner, Ra
     @Override
     public void shootAt(LivingEntity target, float pullProgress) {
 
+    }
+    static {
+        CAN_ATTACK_PREDICATE = (entity) ->
+                !entity.getType().isIn(EntityTypeTags.WITHER_FRIENDS) &&
+                        entity.isMobOrPlayer() &&
+                        // 🔥 新增排除逻辑
+                        entity.getType() != ModEntities.DARK_GOD &&
+                        entity.getType() != ModEntities.GODDESS;
     }
 }

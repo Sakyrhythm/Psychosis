@@ -115,8 +115,39 @@ public abstract class PlayerMixin implements IPlayerEntity {
 
             // --- 核心逻辑: 检查 DarkEffect 依赖并重置状态 ---
             if (darkEffectEntryCache != null) {
-
+                Optional<StatusEffectInstance> darkInstance = queryDarkEffectInstance(); // 使用自定义查询方法
                 boolean hasDarkEffect = player.hasStatusEffect(darkEffectEntryCache);
+
+                if (hasDarkEffect) {
+                    // ⭐ 新增逻辑: 检查等级并施加效果 (如果您坚持在 Mixin 中做)
+                    int amplifier = darkInstance.get().getAmplifier();
+
+                    // --- 施加 VULNERABLE (对应 DarkEffect 阶段 2: amplifier >= 30) ---
+                    if (amplifier >= 30 && playerInterface.getDark() < 50) {
+                        if (vulnerableEffectEntryCache != null) {
+                            // 施加 VULNERABLE 效果 (请确保此方法可用)
+                            player.addStatusEffect(new StatusEffectInstance(vulnerableEffectEntryCache, StatusEffectInstance.INFINITE, 0, true, true, true));
+                            // 建议: 在 Mixin 中，您需要手动实现 DarkEffect 中的消息发送和 lock 设置
+                            // playerInterface.setDarkMsg2Sent(true);
+                            // playerInterface.setDark(50);
+                        }
+                    }
+
+                    // --- 施加 FRENZY (对应 DarkEffect 阶段 3: amplifier >= 70) ---
+                    if (amplifier >= 70 && playerInterface.getDark() < 100) {
+                        if (frenzyEffectEntryCache != null) {
+                            // 施加 FRENZY 效果 (请确保此方法可用)
+                            player.addStatusEffect(new StatusEffectInstance(frenzyEffectEntryCache, StatusEffectInstance.INFINITE, 0, true, true, true));
+                            // 建议: 在 Mixin 中，您需要手动实现 DarkEffect 中的消息发送和 lock 设置
+                            // playerInterface.setDarkMsg3Sent(true);
+                            // playerInterface.setDark(100);
+                        }
+                    }
+
+                } else {
+                    // DarkEffect 消失：执行清除和移除依赖效果 (原有逻辑)
+                    handleDarkEffectRemoval(player, playerInterface);
+                }
 
                 if (!hasDarkEffect) {
                     // DarkEffect 消失：执行清除和移除依赖效果

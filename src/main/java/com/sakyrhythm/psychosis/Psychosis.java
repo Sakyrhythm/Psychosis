@@ -7,6 +7,7 @@ import com.mojang.datafixers.util.Pair;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
+import com.sakyrhythm.psychosis.entity.custom.ScytheBossEntity;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
@@ -16,6 +17,7 @@ import com.sakyrhythm.psychosis.item.ModArmorItems;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
 import com.sakyrhythm.psychosis.item.ModItems;
 import com.sakyrhythm.psychosis.mixin.PlayerMixin;
+import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -116,6 +118,7 @@ public class Psychosis implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModNetworking.register();
 		// ************************************************************
 		// 服务器 Tick 事件: 处理延迟卸载任务
 		// ************************************************************
@@ -139,8 +142,11 @@ public class Psychosis implements ModInitializer {
 		// ************************************************************
 		// 实体注册与属性注册
 		// ************************************************************
+		FabricDefaultAttributeRegistry.register(ModEntities.SCYTHE, ScytheBossEntity.createScytheBossAttributes());
 		FabricDefaultAttributeRegistry.register(ModEntities.PLAYER, PlayerEntity.createPlayerAttributes());
 		FabricDefaultAttributeRegistry.register(ModEntities.DEGENERATEWITHER, PlayerEntity.createPlayerAttributes());
+		FabricDefaultAttributeRegistry.register(ModEntities.DARK_GOD, PlayerEntity.createPlayerAttributes());
+		FabricDefaultAttributeRegistry.register(ModEntities.GODDESS,PlayerEntity.createPlayerAttributes());
 
 		// ************************************************************
 		// 状态效果注册
