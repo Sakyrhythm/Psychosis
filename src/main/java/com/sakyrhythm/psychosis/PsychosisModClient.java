@@ -32,6 +32,11 @@ public class PsychosisModClient implements ClientModInitializer {
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.DARK_DART,DarkDartModel::getTexturedModelData);
         EntityRendererRegistry.register(ModEntities.DARK_DART_PROJECTILE,DarkDartRenderer::new);
         EntityRendererRegistry.register(ModEntities.FLAT_DART, FlatDartRenderer::new);
+        EntityRendererRegistry.register(ModEntities.WHIRLWIND_SLASH_ENTITY_TYPE, WhirlwindSlashRenderer::new);
+        EntityModelLayerRegistry.registerModelLayer(
+                ModModelLayers.MODEL_WHIRLWIND_SLASH, // <-- 使用新的/正确的 ID
+                WhirlwindSlashModel::getTexturedModelData // <-- 绑定刀光自己的模型数据
+        );
         // 3. 关键一步：将你的单头模型数据注册到自定义的模型层上
         EntityModelLayerRegistry.registerModelLayer(
                 ModModelLayers.MODEL_DEGENERATE_WITHER_LAYER,

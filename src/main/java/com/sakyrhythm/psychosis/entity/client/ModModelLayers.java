@@ -13,6 +13,5 @@ public class ModModelLayers {
             new EntityModelLayer(Identifier.of(Psychosis.MOD_ID,"player_slim"),"main");
     public static final EntityModelLayer DARK_DART =
             new EntityModelLayer(Identifier.of(Psychosis.MOD_ID,"dark_dart"),"main");
-    public static final EntityModelLayer FLAT_DART =
-            new EntityModelLayer(Identifier.of(Psychosis.MOD_ID,"flat_dart"),"main");
+    public static final EntityModelLayer MODEL_WHIRLWIND_SLASH = new EntityModelLayer(Identifier.of("psychosis", "whirlwind_slash_model"), "main");
 }

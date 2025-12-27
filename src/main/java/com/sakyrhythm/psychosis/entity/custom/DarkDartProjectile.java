@@ -8,6 +8,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffect;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
 import net.minecraft.item.ItemStack;
@@ -16,6 +17,8 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
@@ -24,7 +27,6 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import net.minecraft.server.world.ServerWorld;
@@ -44,7 +46,12 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
     private static final double MAX_DISTANCE = 400.0;
     private static final double MAX_DISTANCE_SQUARED = MAX_DISTANCE * MAX_DISTANCE;
     private static final float EXPLOSION_POWER = 2.0F;
-    private static final float INSTANT_SPEED = 1000.0F; // 保持高速，依赖Tick处理命中
+
+    // 【修改】：初始速度翻倍 (2000.0F)
+    private static final float INSTANT_SPEED = 2000.0F;
+
+    // 【保持】：每刻速度衰减的乘数 (0.8F)
+    private static final float VELOCITY_DECAY_MULTIPLIER = 0.8F;
 
     private static final RegistryKey<StatusEffect> DARK_EFFECT_KEY = RegistryKey.of(
             RegistryKeys.STATUS_EFFECT,
@@ -193,27 +200,39 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
     public void tick() {
         super.tick();
 
-        if (this.getWorld().isClient()) return;
-
-        // 检查速度是否被设置（即 Pre-Check 通过）
-        if (this.getVelocity().lengthSquared() < 1.0) {
-            // 如果速度为零，说明 Pre-Check 失败，实体应该已经被 discard()
-            return;
-        }
-
-        // 1. 距离检查：强制最大距离限制 (如果 Tick 中仍存在)
-        if (this.age > 0 && this.getOwner() != null) {
-            double distanceSq = this.getOwner().squaredDistanceTo(this);
-
-            // 如果超出最大距离，或者超过 1 个 Tick 仍未命中，强制销毁 (依赖 Pre-Check 减轻了负担)
-            if (distanceSq > MAX_DISTANCE_SQUARED || this.age >= 2) {
-                if (this.getWorld() instanceof ServerWorld serverWorld) {
-                    serverWorld.spawnParticles(ParticleTypes.SMOKE, this.getX(), this.getY(), this.getZ(), 5, 0.1, 0.1, 0.1, 0.0);
+        if (!this.getWorld().isClient()) {
+            // 检查速度是否被设置（即 Pre-Check 通过）
+            if (this.getVelocity().lengthSquared() < 1.0) {
+                if (this.age > 0) {
+                    this.discard();
                 }
-                this.discard();
+                super.tick();
+                return;
+            }
+
+            // 1. 【速度衰减逻辑】：每刻乘以衰减乘数
+            Vec3d currentVelocity = this.getVelocity();
+            Vec3d newVelocity = currentVelocity.multiply(VELOCITY_DECAY_MULTIPLIER);
+            this.setVelocity(newVelocity);
+
+            // 2. 距离和时间检查
+            if (this.age > 0 && this.getOwner() != null) {
+                double distanceSq = this.getOwner().squaredDistanceTo(this);
+
+                // 强制销毁条件：超出最大距离，或者超过 2 刻
+                if (distanceSq > MAX_DISTANCE_SQUARED || this.age >= 2) {
+                    if (this.getWorld() instanceof ServerWorld serverWorld) {
+                        serverWorld.spawnParticles(ParticleTypes.SMOKE, this.getX(), this.getY(), this.getZ(), 5, 0.1, 0.1, 0.1, 0.0);
+                    }
+                    this.discard();
+                    return;
+                }
             }
         }
+
+        super.tick();
     }
+
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
         if (this.getWorld().isClient()) return;
@@ -223,22 +242,12 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
 
             float finalDamage = FIXED_DAMAGE;
 
-            // --- 伤害增强逻辑 ---
-
-            // 1. 确保效果注册入口不为空
+            // --- 伤害增强逻辑 (检查玩家身上的效果) ---
             if (darkEffectEntry != null) {
-
-                // 2. 检查玩家是否拥有该效果
                 if (shooter.hasStatusEffect(darkEffectEntry)) {
-
                     net.minecraft.entity.effect.StatusEffectInstance effectInstance = shooter.getStatusEffect(darkEffectEntry);
-
                     if (effectInstance != null) {
-                        // 等级从 0 开始计数，因此 level = amplifier + 1
-                        int amplifier = effectInstance.getAmplifier();
-                        int effectLevel = amplifier + 1;
-
-                        // 计算增强伤害：每层药水效果，伤害值 + 3.0F
+                        int effectLevel = effectInstance.getAmplifier() + 1;
                         finalDamage += effectLevel * 3.0F;
                         LOGGER.info("Dark Power detected (Level {}). Damage increased to {}." , effectLevel, finalDamage);
                     }
@@ -246,10 +255,52 @@ public class DarkDartProjectile extends PersistentProjectileEntity {
             }
             // --- 结束伤害增强逻辑 ---
 
-            // ... (后续伤害和锚定逻辑保持不变) ...
+            // 造成伤害
             DamageSource src = this.getDamageSources().arrow(this, shooter);
             livingTarget.damage(src, finalDamage);
 
+
+            // ==========================================================
+            // 【修正逻辑】：条件施加黑暗纠缠效果 (0.5秒)
+            // ==========================================================
+            if (darkEffectEntry != null) {
+                // 检查目标是否已经拥有该效果
+                if (!livingTarget.hasStatusEffect(darkEffectEntry)) {
+                    final int DURATION_TICKS = 10; // 0.5 秒
+                    StatusEffectInstance darkEntanglement = new StatusEffectInstance(
+                            darkEffectEntry,
+                            DURATION_TICKS,
+                            0, // Amplifier 0 = Level 1
+                            false,
+                            false,
+                            false
+                    );
+                    // 施加给被命中的目标实体
+                    livingTarget.addStatusEffect(darkEntanglement);
+                    LOGGER.info("Applied Dark Entanglement ({} ticks) to {} due to DarkDart hit.", DURATION_TICKS, livingTarget.getName().getString());
+                } else {
+                    LOGGER.info("{} already has Dark Entanglement. Skipping reapplication.", livingTarget.getName().getString());
+                }
+            }
+            // ==========================================================
+
+            // ==========================================================
+            // 【目标实体播放坚守者音效】
+            // ==========================================================
+            livingTarget.getWorld().playSound(
+                    null,
+                    livingTarget.getX(),
+                    livingTarget.getY(),
+                    livingTarget.getZ(),
+                    SoundEvents.ENTITY_WARDEN_HEARTBEAT,
+                    SoundCategory.HOSTILE,
+                    2.0F,
+                    1.0F + livingTarget.getWorld().random.nextFloat() * 0.2F
+            );
+            // ==========================================================
+
+
+            // 设置锚点 (保持不变)
             if (!this.launcherStack.isEmpty()) {
                 DarkSwordItem.saveAnchor(
                         this.launcherStack,

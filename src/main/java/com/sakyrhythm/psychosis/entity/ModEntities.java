@@ -4,8 +4,9 @@ import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.entity.custom.DWitherEntity;
 import com.sakyrhythm.psychosis.entity.custom.EyeOfDarkEntity;
 import com.sakyrhythm.psychosis.entity.custom.DarkDartProjectile;
-import com.sakyrhythm.psychosis.entity.custom.FlatDartProjectile; // <-- 【新增】导入新的实体类
+import com.sakyrhythm.psychosis.entity.custom.FlatDartProjectile;
 import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
+import com.sakyrhythm.psychosis.entity.custom.WhirlwindSlashEntity; // <-- 【重要】导入圆月斩特效实体类
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
@@ -47,6 +48,22 @@ public class ModEntities {
                     .build()
     );
 
+    // =========================================================================================
+    // 【新增】WHIRLWIND_SLASH_ENTITY_TYPE 实体注册 (圆月斩动画特效实体)
+    // =========================================================================================
+
+    public static final EntityType<WhirlwindSlashEntity> WHIRLWIND_SLASH_ENTITY_TYPE = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "whirlwind_slash"),
+            // 使用 MISC (杂项) SpawnGroup，因为它是一个非交互、短时间存在的特效
+            EntityType.Builder.<WhirlwindSlashEntity>create(WhirlwindSlashEntity::new, SpawnGroup.MISC)
+                    // 尺寸应设置为动画效果的预估最大范围
+                    .dimensions(3.0F, 1.5F) // 例如：水平半径 3 格，高度 1.5 格
+                    .maxTrackingRange(32) // 确保玩家在远距离也能看到特效
+                    .trackingTickInterval(1)
+                    .build()
+    );
+
 
     // =========================================================================================
     // 您已有的注册 (保持不变)
@@ -61,7 +78,7 @@ public class ModEntities {
                     .trackingTickInterval(10)
                     .build()
     );
-    // ... (PlayerEntity 和 DEGENERATEWITHER 注册保持不变) ...
+
     public static final EntityType<PlayerEntity> PLAYER = Registry.register(Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID, "player"),
             EntityType.Builder.create(PlayerEntity::new, SpawnGroup.CREATURE)

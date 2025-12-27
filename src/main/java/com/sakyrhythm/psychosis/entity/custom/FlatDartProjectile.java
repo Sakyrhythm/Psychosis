@@ -75,6 +75,7 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
 
     // =================================================================================
     // 核心逻辑：tick() 方法
+    // (保持不变)
     // =================================================================================
 
     @Override
@@ -166,7 +167,7 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
 
 
     // =================================================================================
-    // 碰撞处理：onEntityHit (正确签名)
+    // 碰撞处理：onEntityHit (已修正施加效果逻辑)
     // =================================================================================
 
 
@@ -194,25 +195,37 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
                         int amplifier = effectInstance.getAmplifier();
                         int effectLevel = amplifier + 1;
 
-                        // 计算增强伤害：每层药水效果，伤害值 + 3.0F
+                        // 计算增强伤害：每层药水效果，伤害值 + 2.0F (与 Dart 保持一致，但这里是 2.0F)
                         finalDamage += effectLevel * 2.0F;
                         LOGGER.info("Dark Power detected (Level {}). Damage increased to {}." , effectLevel, finalDamage);
                     }
                 }
             }
-            if (livingTarget instanceof LivingEntity livingEntity && darkEffectEntry != null) {
-                int durationTicks = 10;
-                int amplifier = 0;
 
-                livingEntity.addStatusEffect(new StatusEffectInstance(
-                        darkEffectEntry,
-                        durationTicks,
-                        amplifier,
-                        false,
-                        false,
-                        true
-                ));
+            // ==========================================================
+            // 【修正逻辑】：条件施加黑暗纠缠效果
+            // ==========================================================
+            if (darkEffectEntry != null) {
+                // 检查目标是否已经拥有该效果
+                if (!livingTarget.hasStatusEffect(darkEffectEntry)) {
+                    final int DURATION_TICKS = 10;
+                    final int AMPLIFIER = 0;
+
+                    livingTarget.addStatusEffect(new StatusEffectInstance(
+                            darkEffectEntry,
+                            DURATION_TICKS,
+                            AMPLIFIER,
+                            false,
+                            false,
+                            true
+                    ));
+                    LOGGER.info("Applied Dark Entanglement ({} ticks) to {} due to FlatDart hit.", DURATION_TICKS, livingTarget.getName().getString());
+                } else {
+                    LOGGER.info("{} already has Dark Entanglement. Skipping reapplication.", livingTarget.getName().getString());
+                }
             }
+            // ==========================================================
+
             DamageSource src = this.getDamageSources().arrow(this, shooter);
             livingTarget.damage(src, finalDamage);
         }
