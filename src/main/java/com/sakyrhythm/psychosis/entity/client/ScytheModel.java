@@ -148,7 +148,7 @@ public class ScytheModel <T extends ScytheBossEntity> extends SinglePartEntityMo
     public void render(MatrixStack matrices, VertexConsumer vertexConsumer, int light, int overlay, int color) {
         float scale = 1.25F;
         matrices.scale(scale, 1.5f, scale);
-        // 不需要再写 matrices.translate/scale，因为 updateAnimation 已经修改了 bone 和 bone5 的参数
+        matrices.translate(tempVec.x, tempVec.y-1.5, tempVec.z);
         this.bone6.render(matrices, vertexConsumer, light, overlay, color);
     }
 }

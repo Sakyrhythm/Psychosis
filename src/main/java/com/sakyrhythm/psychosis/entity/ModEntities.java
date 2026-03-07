@@ -1,11 +1,12 @@
 package com.sakyrhythm.psychosis.entity;
 
 import com.sakyrhythm.psychosis.Psychosis;
+import com.sakyrhythm.psychosis.block.ModBlocks;
+import com.sakyrhythm.psychosis.block.entity.WhisperingShellBlockEntity;
 import com.sakyrhythm.psychosis.entity.custom.*;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.block.Blocks;
-import net.minecraft.entity.EntityDimensions;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
@@ -28,6 +29,11 @@ public class ModEntities {
                     .maxTrackingRange(8)
                     .trackingTickInterval(1)
                     .build()
+    );
+    public static final BlockEntityType<WhisperingShellBlockEntity> WHISPERING_SHELL_BE = Registry.register(
+            Registries.BLOCK_ENTITY_TYPE,
+            Identifier.of("psychosis", "whispering_shell_be"),
+            BlockEntityType.Builder.create(WhisperingShellBlockEntity::new, ModBlocks.WHISPERING_SHELL).build()
     );
 
 
@@ -70,7 +76,7 @@ public class ModEntities {
             Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID, "nail"),
             EntityType.Builder.<NailEntity>create(NailEntity::new, SpawnGroup.MISC)
-                    .dimensions(0.4F, 2.5F)   // 细长钉子
+                    .dimensions(1F, 1F)   // 细长钉子
                     .maxTrackingRange(32)
                     .trackingTickInterval(1)
                     .build()
@@ -85,7 +91,7 @@ public class ModEntities {
                     Registries.ENTITY_TYPE,
                     Identifier.of(Psychosis.MOD_ID, "scythe"),
                     EntityType.Builder.create(ScytheBossEntity::new, SpawnGroup.MONSTER)
-                            .dimensions(1.2f, 3.0f)
+                            .dimensions(1.2f, 4.5f)
                             .makeFireImmune()
                             .maxTrackingRange(64)
                             .build()
@@ -117,7 +123,6 @@ public class ModEntities {
                     .trackingTickInterval(2)
                     .build());
 
-
     public static final EntityType<DWitherEntity> DEGENERATEWITHER = Registry.register(Registries.ENTITY_TYPE,
             Identifier.of(Psychosis.MOD_ID,"degeneratewither"),
             EntityType.Builder.create(DWitherEntity::new, SpawnGroup.MONSTER)
@@ -136,6 +141,16 @@ public class ModEntities {
                             .makeFireImmune()
                             .build()
             );
+    // 在 ModEntities 类中添加以下字段
+    public static final EntityType<TentacleEntity> TENTACLE = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "tentacle"),
+            EntityType.Builder.<TentacleEntity>create(TentacleEntity::new, SpawnGroup.MISC)
+                    .dimensions(0.5F, 0.5F)
+                    .maxTrackingRange(32)
+                    .trackingTickInterval(1)
+                    .build()
+    );
     public static final EntityType<GoddessEntity> GODDESS =
             Registry.register(
                     Registries.ENTITY_TYPE,

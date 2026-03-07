@@ -5,8 +5,11 @@ import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.entity.model.SinglePartEntityModel;
 import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Vector3f;
 
 public class NailModel<T extends NailEntity> extends SinglePartEntityModel<T> {
+
+	private final Vector3f tempVec = new Vector3f();
 	private final ModelPart bone;
 	public NailModel(ModelPart root) {
 		this.bone = root.getChild("bone");
@@ -14,7 +17,7 @@ public class NailModel<T extends NailEntity> extends SinglePartEntityModel<T> {
 	public static TexturedModelData getTexturedModelData() {
 		ModelData modelData = new ModelData();
 		ModelPartData modelPartData = modelData.getRoot();
-		ModelPartData bone = modelPartData.addChild("bone", ModelPartBuilder.create(), ModelTransform.of(0.0F, 24.0F, 0.0F, 0.0F, 0.0F, 0.4363F));
+		ModelPartData bone = modelPartData.addChild("bone", ModelPartBuilder.create(), ModelTransform.of(0.0F, 36.0F, 0.0F, 0.0F, 0.0F, 0.4363F));
 
 		ModelPartData cube_r1 = bone.addChild("cube_r1", ModelPartBuilder.create().uv(28, 22).cuboid(-0.5F, -1.5F, -1.1579F, 1.0F, 3.0F, 2.0F, new Dilation(0.0F)), ModelTransform.of(-12.7261F, -23.0665F, 1.9679F, -2.6116F, -1.0621F, -2.653F));
 
@@ -33,12 +36,12 @@ public class NailModel<T extends NailEntity> extends SinglePartEntityModel<T> {
 		ModelPartData cube_r8 = bone.addChild("cube_r8", ModelPartBuilder.create().uv(12, 9).cuboid(-0.5F, -1.4F, -1.5F, 1.0F, 5.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(1.7255F, 0.0F, -0.5F, 0.0F, 0.0F, -0.0873F));
 
 		ModelPartData cube_r9 = bone.addChild("cube_r9", ModelPartBuilder.create().uv(20, 0).cuboid(1.0F, -4.0F, -2.0F, 1.0F, 4.0F, 3.0F, new Dilation(0.0F))
-		.uv(12, 17).cuboid(1.0F, -4.0F, -2.0F, 1.0F, 4.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-1.0F, -2.0F, 0.0F, 0.0F, 0.0F, -0.6981F));
+				.uv(12, 17).cuboid(1.0F, -4.0F, -2.0F, 1.0F, 4.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(-1.0F, -2.0F, 0.0F, 0.0F, 0.0F, -0.6981F));
 
 		ModelPartData cube_r10 = bone.addChild("cube_r10", ModelPartBuilder.create().uv(20, 17).cuboid(1.0F, -3.0F, -2.0F, 1.0F, 3.0F, 3.0F, new Dilation(0.0F))
-		.uv(12, 24).cuboid(-2.0F, -3.0F, -3.0F, 3.0F, 3.0F, 1.0F, new Dilation(0.0F))
-		.uv(20, 23).cuboid(-2.0F, -3.0F, 1.0F, 3.0F, 3.0F, 1.0F, new Dilation(0.0F))
-		.uv(0, 0).cuboid(-2.0F, -26.0F, -2.0F, 3.0F, 26.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, -0.4363F));
+				.uv(12, 24).cuboid(-2.0F, -3.0F, -3.0F, 3.0F, 3.0F, 1.0F, new Dilation(0.0F))
+				.uv(20, 23).cuboid(-2.0F, -3.0F, 1.0F, 3.0F, 3.0F, 1.0F, new Dilation(0.0F))
+				.uv(0, 0).cuboid(-2.0F, -26.0F, -2.0F, 3.0F, 26.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, -0.4363F));
 
 		ModelPartData cube_r11 = bone.addChild("cube_r11", ModelPartBuilder.create().uv(20, 12).cuboid(-1.0F, 0.0F, -3.0F, 2.0F, 2.0F, 3.0F, new Dilation(0.0F)), ModelTransform.of(0.0F, 0.0F, -3.0F, 1.9199F, 0.0F, -0.5236F));
 

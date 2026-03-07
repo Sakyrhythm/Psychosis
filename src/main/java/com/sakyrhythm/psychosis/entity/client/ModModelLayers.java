@@ -33,4 +33,6 @@ public class ModModelLayers {
 
     public static final EntityModelLayer SCYTHE =
             new EntityModelLayer(Identifier.of(Psychosis.MOD_ID, "scythe"), "main");
+    public static final EntityModelLayer TENTACLE =
+            new EntityModelLayer(Identifier.of(Psychosis.MOD_ID, "tentacles"), "main");
 }

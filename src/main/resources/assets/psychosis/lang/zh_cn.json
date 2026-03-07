@@ -11,6 +11,7 @@
   "item.psychosis.divine_boots": "神圣便鞋",
   "block.psychosis.dark_portal_frame": "幽暗基石",
   "block.psychosis.dark_stone": "浊秽石",
+  "block.psychosis.whispering_shell": "低语之螺",
   "block.psychosis.dark_dirt": "腐土",
   "block.psychosis.dark_cobblestone": "裂变浊石",
   "effect.psychosis.dark": "黑暗纠缠",
@@ -42,5 +43,7 @@
   "tooltip.psychosis.dark_sword.anchor_to_entity": "锚定至：§l生灵印记",
   "tooltip.psychosis.dark_sword.anchor_dim": "位面回响: %s",
   "entity.psychosis.dark_god": "冥王残魂",
-  "entity.psychosis.goddess": "虚空女神"
+  "entity.psychosis.goddess": "虚空女神",
+  "entity.psychosis.scythe": "收割者",
+  "entity.psychosis.nail": "灾厄"
 }

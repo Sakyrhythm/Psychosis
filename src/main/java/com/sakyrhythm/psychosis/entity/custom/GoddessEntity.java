@@ -640,13 +640,12 @@ public class GoddessEntity extends HostileEntity {
                 }
             }
 
-            // 1. 连闪执行
+            // 连闪
             if (rapidFlashLeft > 0 && this.age % RAPID_FLASH_INTERVAL == 0) {
                 rapidFlashLeft--;
-                triggerDamageParticle(); // 闪避不再需要参数
+                triggerDamageParticle();
             }
 
-            // 🔥 2. Hexagram 计时器和随机刷新 🔥
             if (this.currentShield <= 0.001F) {
                 this.hexagramTimer--;
                 this.dataTracker.set(HEXAGRAM_TIMER_TRACKED, this.hexagramTimer);

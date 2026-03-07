@@ -93,6 +93,8 @@ public class PsychosisModClient implements ClientModInitializer {
         EntityRendererRegistry.register(ModEntities.WHIRLWIND_SLASH_ENTITY_TYPE, WhirlwindSlashRenderer::new);
         EntityRendererRegistry.register(ModEntities.NAIL, NailRenderer::new);
         EntityRendererRegistry.register(ModEntities.SCYTHE, ScytheRenderer::new);
+        EntityRendererRegistry.register(ModEntities.TENTACLE, TentacleEntityRenderer::new);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.TENTACLE, TentacleModel::getTexturedModelData);
         EntityModelLayerRegistry.registerModelLayer(
                 ModModelLayers.MODEL_WHIRLWIND_SLASH, // <-- 使用新的/正确的 ID
                 WhirlwindSlashModel::getTexturedModelData // <-- 绑定刀光自己的模型数据

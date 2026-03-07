@@ -31,23 +31,20 @@ public class NailRenderer extends EntityRenderer<NailEntity> {
 
     @Override
     public void render(NailEntity entity, float yaw, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        // ⭐ 核心修改：如果还在 1.75 秒的预警期内，直接跳过渲染
+        if (entity.getSpawnDelay() > 0) {
+            return;
+        }
+
         matrices.push();
 
-        // 平滑插值角度
+        // 这里的转向建议使用 MathHelper.lerp 来保证平滑感
         float fYaw = MathHelper.lerp(tickDelta, entity.prevYaw, entity.getYaw());
         float fPitch = MathHelper.lerp(tickDelta, entity.prevPitch, entity.getPitch());
-
-        // 1. 基础转向 (Y轴) - 将模型转向实体的 Yaw
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(fYaw));
-
-        // 2. 俯仰转向 (X轴) - 将模型转向实体的 Pitch
-        // 注意：这里的正负号取决于你希望尖头向上还是向下弯。通常是负号。
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-fPitch));
 
-        // 3. 模型姿态校准 (关键！)
-        // 因为你的尖头在模型里是朝上的 (+Y)，
-        // 我们需要把 +Y 旋转到水平的前方 (对应实体朝向的 Z 轴)。
-        // 旋转 -90度 或 90度 绕 X 轴：
+        // 你的模型姿态修正 (尖头朝上转为朝前)
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
 
         VertexConsumer vertexConsumer = vertexConsumers.getBuffer(this.model.getLayer(this.getTexture(entity)));

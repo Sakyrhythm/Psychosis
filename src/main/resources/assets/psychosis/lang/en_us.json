@@ -42,5 +42,7 @@
   "tooltip.psychosis.dark_sword.anchor_to_entity": "Bound to: §lA Mortal Host",
   "tooltip.psychosis.dark_sword.anchor_dim": "Echo of the Plane: %s",
   "entity.psychosis.dark_god": "Hades' Lingering Will",
-  "entity.psychosis.goddess": "Valkyrie of the Void"
+  "entity.psychosis.goddess": "Valkyrie of the Void",
+  "entity.psychosis.scythe": "Reaper",
+  "entity.psychosis.nail": "Bane"
 }

@@ -24,6 +24,12 @@ public class ModBlocks {
             .luminance((state) -> {
                 return 1;
             }).strength(-1.0F, 3600000.0F).dropsNothing()));
+    public static final Block WHISPERING_SHELL = register("whispering_shell",new WhisperingShell(AbstractBlock.Settings.create()
+            .mapColor(MapColor.WATER_BLUE)
+            .sounds(BlockSoundGroup.STONE)
+            .luminance((state) -> {
+                return 1;
+            }).strength(-1.0F, 3600000.0F).dropsNothing()));
 
     public static void registerBlockItems(String id, Block block) {
         Item item = Registry.register(Registries.ITEM, Identifier.of(Psychosis.MOD_ID, id), new BlockItem(block, new Item.Settings()));
