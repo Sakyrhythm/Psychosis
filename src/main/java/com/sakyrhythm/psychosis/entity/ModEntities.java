@@ -170,6 +170,9 @@ public class ModEntities {
         FabricDefaultAttributeRegistry.register(
                 DARK_GOD, DarkGodEntity.createDarkGodAttributes()
         );
+        FabricDefaultAttributeRegistry.register(
+                GODDESS, GoddessEntity.createGoddessBossAttributes()
+        );
     }
 
     public static void registerModEntities() {

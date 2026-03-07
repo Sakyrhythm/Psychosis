@@ -154,7 +154,6 @@ public class PlayerEntity extends AnimalEntity {
                     currentDamageTarget = null;
                     ticksUntilNextDetection = COOLDOWN_TICKS;
                     this.remove(RemovalReason.DISCARDED);
-                    return;
                 }
             }
         }
