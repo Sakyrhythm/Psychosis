@@ -1,10 +1,15 @@
 package com.sakyrhythm.psychosis.mixin;
 
 import com.sakyrhythm.psychosis.Psychosis;
+import com.sakyrhythm.psychosis.config.ModConfig;
 import com.sakyrhythm.psychosis.entity.custom.DarkGodEntity;
 import com.sakyrhythm.psychosis.entity.custom.GoddessEntity;
 import com.sakyrhythm.psychosis.interfaces.ILivingEntity;
+import com.sakyrhythm.psychosis.item.ModItems;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.attribute.EntityAttributeInstance;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.damage.DamageTypes;
@@ -28,6 +33,9 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.Heightmap;
+import net.minecraft.world.World;
+import net.minecraft.world.biome.Biome;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -73,7 +81,14 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     @Unique
     private static final float GODDESS_MAX_DAMAGE_PERCENT_DIVINE = 0.30F; // Goddess Divine 限伤 30%
 
-
+    @Unique
+    private static final Identifier RAIN_SLOWNESS_ID = Identifier.of("psychosis", "rain_slowness");
+    @Unique
+    private static final EntityAttributeModifier RAIN_SLOWNESS_MODIFIER = new EntityAttributeModifier(
+            RAIN_SLOWNESS_ID,
+            -0.15, // 减速 15%，数值可调 (Slowness I 约等于 -0.15)
+            EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+    );
     @Override
     public @Nullable LivingEntity psychosis_template_1_21$getLastAttacker() {
         return this.lastAttacker;
@@ -161,7 +176,44 @@ public abstract class LivingEntityMixin implements ILivingEntity {
             }
         }
     }
-    // --- Mixin 修正结束 ---
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void psychosis$applyRainSlowness(CallbackInfo ci) {
+        LivingEntity entity = (LivingEntity) (Object) this;
+        World world = entity.getWorld();
+        if (world.isClient) return;
+
+        EntityAttributeInstance speedAttr = entity.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED);
+        if (speedAttr == null) return;
+
+        // 判定条件
+        boolean shouldSlow = false;
+        if (ModConfig.enableRainSlowness && world.isRaining()) {
+            BlockPos pos = entity.getBlockPos();
+            boolean isExposedInRain = world.isSkyVisible(pos) &&
+                    world.getTopY(Heightmap.Type.MOTION_BLOCKING, pos.getX(), pos.getZ()) <= pos.getY() &&
+                    world.getBiome(pos).value().getPrecipitation(pos) == Biome.Precipitation.RAIN;
+
+            boolean hasUmbrella = entity.getMainHandStack().isOf(ModItems.UMBRELLA)
+                    || entity.getOffHandStack().isOf(ModItems.UMBRELLA);
+
+            if (isExposedInRain && !hasUmbrella) {
+                shouldSlow = true;
+            }
+        }
+
+        // 应用或移除修改器
+        if (shouldSlow) {
+            if (!speedAttr.hasModifier(RAIN_SLOWNESS_ID)) {
+                speedAttr.addTemporaryModifier(RAIN_SLOWNESS_MODIFIER);
+                // 可选：给玩家发送一条非常隐晦的消息，或者完全保持安静
+                // entity.sendMessage(Text.literal("雨水打湿了你的衣服...").formatted(Formatting.GRAY), true);
+            }
+        } else {
+            if (speedAttr.hasModifier(RAIN_SLOWNESS_ID)) {
+                speedAttr.removeModifier(RAIN_SLOWNESS_ID);
+            }
+        }
+    }
 
 
     @Inject(
@@ -280,9 +332,8 @@ public abstract class LivingEntityMixin implements ILivingEntity {
                     .orElse(null);
 
             if (frenzyEffectEntry != null && attacker.hasStatusEffect(frenzyEffectEntry)) {
-                float damageBeforeFrenzy = originalAmount;
-                currentDamage = damageBeforeFrenzy * 1.70f;
-                float selfDamage = damageBeforeFrenzy * 0.30f;
+                currentDamage = originalAmount * 1.70f;
+                float selfDamage = originalAmount * 0.30f;
 
                 RegistryEntry.Reference<DamageType> frenzyDamageTypeEntry = livingEntity.getWorld().getRegistryManager()
                         .get(RegistryKeys.DAMAGE_TYPE)

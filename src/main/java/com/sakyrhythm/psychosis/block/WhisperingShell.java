@@ -11,6 +11,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.StateManager;
@@ -23,6 +24,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
@@ -122,11 +124,101 @@ public class WhisperingShell extends Block implements Waterloggable, BlockEntity
         return new WhisperingShellBlockEntity(pos, state);
     }
 
+    @Override
+    public void randomDisplayTick(BlockState state, World world, BlockPos pos, Random random) {
+        // 只在客户端执行粒子效果
+        if (!world.isClient) return;
+
+        // 1. 找到水面的基准位置 (从方块位置向上寻找水面)
+        BlockPos.Mutable surfacePos = pos.mutableCopy();
+        while (world.getFluidState(surfacePos.up()).isStill()) {
+            surfacePos.move(Direction.UP);
+            // 防止无限循环 (最大向上寻找24格)
+            if (surfacePos.getY() >= world.getTopY() || surfacePos.getY() - pos.getY() > 24) break;
+        }
+
+        // 只有当水面顶部确实是空气时，才产生粒子
+        BlockState surfaceBlockState = world.getBlockState(surfacePos.up());
+        if (!surfaceBlockState.isAir()) return;
+
+        // ========== 核心参数调整 ==========
+        // 1. 单 tick 生成数量: 提高到 200 (视觉效果非常密集，如果觉得卡顿可以降到100)
+        int particleCount = 100;
+        // 2. 生成范围半径: 扩大到 5.0 格，让整个水面区域沸腾
+        double range = 12.0;
+        // 3. 气泡上升速度: 增加随机性，看起来更自然
+        // ================================
+
+        for (int i = 0; i < particleCount; i++) {
+            // 在水平面上随机偏移
+            double offsetX = (random.nextDouble() - 0.5) * range * 2; // 范围: -range 到 +range
+            double offsetZ = (random.nextDouble() - 0.5) * range * 2;
+
+            // 计算目标检查点的位置
+            BlockPos checkPos = BlockPos.ofFloored(
+                    surfacePos.getX() + offsetX,
+                    surfacePos.getY(),
+                    surfacePos.getZ() + offsetZ
+            );
+
+            // 检查该点是否也是水源方块 (确保粒子只生成在水面上)
+            if (world.getFluidState(checkPos).isStill() && world.getBlockState(checkPos.up()).isAir()) {
+
+                // 粒子的精确位置 (随机微调，避免完全对齐网格)
+                double px = (double) checkPos.getX() + 0.3 + random.nextDouble() * 0.4; // 0.3~0.7 范围
+                double py = (double) checkPos.getY() + 0.9 + random.nextDouble() * 0.2; // 水面稍微往上一点
+                double pz = (double) checkPos.getZ() + 0.3 + random.nextDouble() * 0.4;
+
+                // 🎯 生成主要气泡粒子
+                // 速度: Y轴速度稍快且随机，X/Z有微小扰动
+                double velX = (random.nextDouble() - 0.5) * 0.02;
+                double velY = 0.25 + random.nextDouble() * 0.2; // 上升速度随机
+                double velZ = (random.nextDouble() - 0.5) * 0.02;
+                world.addParticle(ParticleTypes.BUBBLE, px, py, pz, velX, velY, velZ);
+
+                // 🎯 增加"泡泡破裂"效果 (30%的概率)
+                if (random.nextFloat() < 0.3f) {
+                    world.addParticle(ParticleTypes.BUBBLE_POP, px, py + 0.1, pz, 0.0, 0.01, 0.0);
+                }
+
+                // 🎯 增加"水花飞溅"效果 (15%的概率)
+                if (random.nextFloat() < 0.15f) {
+                    world.addParticle(ParticleTypes.SPLASH, px, py + 0.1, pz, 0.0, 0.1, 0.0);
+                }
+
+                // 🎯 额外: 生成一些"水下烟雾"或"灵魂"效果来模拟深海热泉 (5%的概率)
+                if (random.nextFloat() < 0.05f) {
+                    world.addParticle(ParticleTypes.SOUL,
+                            px, py - 0.5, pz, // 从水面下一点开始
+                            0.0, 0.2, 0.0);
+                }
+            }
+        }
+
+        // 🎯 特殊效果: 每 tick 有 10% 的概率在中心生成一个大团气泡
+        if (random.nextFloat() < 0.1f) {
+            // 在中心点生成一团密集气泡
+            double centerX = surfacePos.getX() + 0.5;
+            double centerY = surfacePos.getY() + 0.95;
+            double centerZ = surfacePos.getZ() + 0.5;
+            for (int j = 0; j < 20; j++) {
+                double smallOffsetX = (random.nextDouble() - 0.5) * 1.5;
+                double smallOffsetZ = (random.nextDouble() - 0.5) * 1.5;
+                world.addParticle(ParticleTypes.BUBBLE,
+                        centerX + smallOffsetX, centerY + random.nextDouble() * 0.3, centerZ + smallOffsetZ,
+                        0.0, 0.3 + random.nextDouble() * 0.2, 0.0);
+            }
+        }
+    }
+
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        // 1.21 手动 Lambda 写法，解决 checkType/validateTicker 报错
-        return world.isClient ? null : (type == ModEntities.WHISPERING_SHELL_BE ?
-                (world1, pos1, state1, blockEntity) -> WhisperingShellBlockEntity.tick(world1, pos1, state1, (WhisperingShellBlockEntity) blockEntity) : null);
+        // 检查类型是否匹配
+        if (type != ModEntities.WHISPERING_SHELL_BE) {
+            return null;
+        }
+        return (world1, pos1, state1, blockEntity) ->
+                WhisperingShellBlockEntity.tick(world1, pos1, state1, (WhisperingShellBlockEntity) blockEntity);
     }
 }

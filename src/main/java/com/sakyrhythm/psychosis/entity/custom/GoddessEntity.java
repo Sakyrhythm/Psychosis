@@ -3,7 +3,6 @@ package com.sakyrhythm.psychosis.entity.custom;
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.block.DarkPortalFrameBlock;
 import com.sakyrhythm.psychosis.block.ModBlocks;
-import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.minecraft.block.BlockState;
@@ -20,15 +19,11 @@ import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.particle.DustParticleEffect;
-import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.particle.SimpleParticleType;
 import net.minecraft.registry.RegistryKey;
@@ -61,7 +56,7 @@ public class GoddessEntity extends HostileEntity {
     private static final float PHASE_TWO_THRESHOLD = 0.50F;
     private static final float EPSILON = 0.001F;
     // --- 护盾常量 ---
-    private static final float SHIELD_HEALTH = 100.0F;
+    private static final float SHIELD_HEALTH = 300.0F;
     private float currentShield = SHIELD_HEALTH;
     private int beamDelayTimer = -1;
     // --- 状态持续时间 ---
@@ -99,7 +94,6 @@ public class GoddessEntity extends HostileEntity {
     // --- 受伤粒子化/连闪常量 (新增) ---
     private static final int DAMAGE_PARTICLE_DURATION = 4;
     private static final double DAMAGE_RETREAT_DISTANCE = 3.0; // 后撤3格
-    private static final int RAPID_FLASH_INTERVAL = 1;
     private int rapidFlashLeft = 0; // 剩余连闪次数
 
     // --- 反击常量 ---
@@ -151,15 +145,6 @@ public class GoddessEntity extends HostileEntity {
     public final RegistryEntry<net.minecraft.entity.effect.StatusEffect> darkEffectEntry;
     public final RegistryEntry<net.minecraft.entity.effect.StatusEffect> vulnerableEffectEntry;
     public final RegistryEntry<net.minecraft.entity.effect.StatusEffect> frenzyEffectEntry;
-    private Optional<RegistryEntry.Reference<StatusEffect>> getStatusEffectEntry(LivingEntity entity, String id) {
-        return entity.getWorld().getRegistryManager()
-                .get(RegistryKeys.STATUS_EFFECT)
-                .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, id)));
-    }
-    public void removeEffect(LivingEntity entity, String id) {
-        // 优化：使用动态获取的 Reference 进行移除，更符合注册表 API
-        getStatusEffectEntry(entity, id).ifPresent(entity::removeStatusEffect);
-    }
     // 阶段和攻击状态字段
     private boolean isPhaseTwo = false;
     private int attackCooldownTimer = 0;
@@ -197,18 +182,10 @@ public class GoddessEntity extends HostileEntity {
         super(entityType, world);
         this.setCustomName(Text.translatable("entity.psychosis.goddess"));
         this.setCustomNameVisible(false);
-
-        // 🔥 初始化 Boss 条
-        this.shieldBossBar = new ServerBossBar(
-                this.getDisplayName(),
-                BossBar.Color.WHITE,  // 护盾为白色
-                BossBar.Style.PROGRESS
-        );
-        this.healthBossBar = new ServerBossBar(
-                this.getDisplayName(),
-                BossBar.Color.RED,    // 血量为红色
-                BossBar.Style.PROGRESS
-        );
+        // 护盾 = 白色，带名字
+        this.shieldBossBar = new ServerBossBar(this.getDisplayName(), BossBar.Color.WHITE, BossBar.Style.PROGRESS);
+        // 血量 = 红色，名字为空
+        this.healthBossBar = new ServerBossBar(net.minecraft.text.Text.empty(), BossBar.Color.RED, BossBar.Style.PROGRESS);
 
         this.setPersistent();
 
@@ -250,13 +227,6 @@ public class GoddessEntity extends HostileEntity {
         builder.add(HEXAGRAM_TIMER_TRACKED, HEXAGRAM_CYCLE_DURATION); // 🔥 新增：Hexagram 计时器
     }
 
-    // --- 碰撞箱/渲染控制 ---
-    protected boolean canStartTargeting() { return !this.isAppearing(); }
-
-    public boolean collides() {
-        return !this.isAppearing() && !this.isParticlized();
-    }
-
     @Override
     public boolean isInvisible() {
         return super.isInvisible() || this.isParticlized() || this.isAppearing();
@@ -269,24 +239,55 @@ public class GoddessEntity extends HostileEntity {
         return super.isInvisibleTo(player);
     }
 
-    // --- 实体属性设置 ---
-    public static DefaultAttributeContainer.Builder createGoddessAttributes() {
-        return HostileEntity.createHostileAttributes()
-                .add(EntityAttributes.GENERIC_MAX_HEALTH, 800.0)
-                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.0)
-                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 10.0)
-                .add(EntityAttributes.GENERIC_FOLLOW_RANGE, 40.0)
-                .add(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE, 1.0);
-    }
-
     @Override
     protected void initGoals() {
+    }
+    public static DefaultAttributeContainer.Builder createGoddessBossAttributes() {
+        return HostileEntity.createHostileAttributes()
+                .add(EntityAttributes.GENERIC_MAX_HEALTH, 900.0)
+                .add(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE, 1.0)
+                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.0);
     }
 
     // --- 八芒星 Getter/Setter ---
     public HexagramType getHexagramType() {
         if (this.dataTracker == null) return HexagramType.NONE;
         return HexagramType.values()[this.dataTracker.get(HEXAGRAM_TYPE_TRACKED)];
+    }
+    @Override
+    public boolean isCollidable() {
+        // 允许穿过 Boss
+        return false;
+    }
+
+    @Override
+    public boolean isPushable() {
+        // 防止被挤走
+        return false;
+    }
+
+    @Override
+    public boolean collidesWith(Entity other) {
+        // 不产生物理碰撞计算
+        return false;
+    }
+    @Override
+    public void pushAway(Entity entity) {
+        // ⭐ 核心：当有实体（玩家或生物）触碰到 Boss 碰撞箱时触发
+        if (this.getWorld().isClient) return;
+
+        // 如果正在出场、已经粒子化、或者正在处理连闪，则不重复触发
+        if (this.isAppearing() || this.isParticlized() || this.rapidFlashLeft > 0) return;
+
+        // 只在 IDLE (空闲) 或 RECOVERY (收招) 状态下触发闪避，防止中断攻击技能
+        if (this.attackState == AttackState.IDLE || this.attackState == AttackState.RECOVERY) {
+            // 设置连闪次数 (例如连闪 3 次)
+            this.rapidFlashLeft = 3;
+            // 立即执行第一次闪避
+            this.triggerDamageParticle();
+
+            System.out.println("DEBUG (Server): Boss touched by " + entity.getName().getString() + "! Triggering Rapid Flash.");
+        }
     }
 
     public void setHexagramType(HexagramType type) {
@@ -459,9 +460,9 @@ public class GoddessEntity extends HostileEntity {
 
         // 2. 获取目标玩家和发射点
         Box searchBox = this.getBoundingBox().expand(COUNTER_ATTACK_RANGE);
-        Set<PlayerEntity> currentTargets = new HashSet<>(serverWorld.getPlayers(player ->
+        serverWorld.getPlayers(player ->
                 player.isAlive() && searchBox.contains(player.getPos())
-        ));
+        );
 
         BlockPos blockLocation = this.getSummoningAnchorPos();
         if (blockLocation == null) {
@@ -562,18 +563,16 @@ public class GoddessEntity extends HostileEntity {
         this.dataTracker.set(IS_PARTICLIZED_TRACKED, false);
     }
 
-    private boolean startAttackLogic() {
+    private void startAttackLogic() {
         this.attackCooldownTimer = ATTACK_COOLDOWN;
         this.currentTarget = this.getWorld().getClosestPlayer(this, 40.0);
         if (this.currentTarget != null) {
             this.attackState = AttackState.WINDUP;
             this.attackTimer = WINDUP_DURATION;
             this.dataTracker.set(IS_PARTICLIZED_TRACKED, false);
-            return true;
         } else {
             this.attackState = AttackState.IDLE;
             this.attackCooldownTimer = 0;
-            return false;
         }
     }
     public BlockPos getSummoningAnchorPos() {
@@ -599,13 +598,24 @@ public class GoddessEntity extends HostileEntity {
 
             // 使用 tracker 的 findClosest 方法，该方法现在已移除距离限制
             Optional<BlockPos> targetPosOptional = tracker.findClosest(this.getBlockPos());
-            BlockPos targetPos = targetPosOptional.orElse(null);
-            return targetPos;
+            return targetPosOptional.orElse(null);
         }
 
         return null;
     }
 
+    private void resetSummoningBlock() {
+        BlockPos pos = this.getSummoningAnchorPos();
+        if (pos != null) {
+            World world = this.getWorld();
+            BlockState blockState = world.getBlockState(pos);
+            if (blockState.isOf(ModBlocks.DARK_BLOCK) && blockState.get(DarkPortalFrameBlock.EYE)) {
+                BlockState newBlockState = blockState.with(DarkPortalFrameBlock.EYE, false);
+                world.setBlockState(pos, newBlockState, 3);
+                world.updateComparators(pos, ModBlocks.DARK_BLOCK);
+            }
+        }
+    }
 
     // --- T I C K 主循环 ---
     @Override
@@ -615,6 +625,15 @@ public class GoddessEntity extends HostileEntity {
         getSummoningAnchorPos();
 
         if (!this.getWorld().isClient()) {
+            if (!this.isAppearing()) {
+                PlayerEntity closestPlayer = this.getWorld().getClosestPlayer(this, this.getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE));
+
+                if (closestPlayer == null) {
+                    this.resetSummoningBlock();
+                    this.disappear();
+                    return;
+                }
+            }
             if (this.beamDelayTimer > 0) {
                 this.beamDelayTimer--;
                 if (this.beamDelayTimer == 0) {
@@ -641,7 +660,7 @@ public class GoddessEntity extends HostileEntity {
             }
 
             // 连闪
-            if (rapidFlashLeft > 0 && this.age % RAPID_FLASH_INTERVAL == 0) {
+            if (rapidFlashLeft > 0) {
                 rapidFlashLeft--;
                 triggerDamageParticle();
             }
@@ -718,13 +737,52 @@ public class GoddessEntity extends HostileEntity {
             }
         }
     }
-    /* --------------------------------------------------------------------- */
-    /* 核心逻辑方法：延迟执行的反击光束和惩罚                                    */
-    /* --------------------------------------------------------------------- */
-    /**
-     * 在 beamDelayTimer 计时器归零时由 tick() 方法调用。
-     * 执行反击三段斩的光束发射、伤害计算和图腾/致死惩罚。
-     */
+    @Override
+    public void onDeath(DamageSource source) {
+        super.onDeath(source); // 执行原版死亡逻辑（掉落等）
+
+        if (!this.getWorld().isClient) {
+            ServerWorld serverWorld = (ServerWorld) this.getWorld();
+            BlockPos deathPos = this.getBlockPos();
+            serverWorld.syncWorldEvent(2006, deathPos, 0);
+            // 1. 执行自定义死亡特效
+            this.spawnEpicDeathEffects(serverWorld);
+
+            // 2. 向附近玩家发送大标题 (Title)
+            this.sendDeathTitleToPlayers(serverWorld);
+
+            // 3. 重置召唤方块
+            this.resetSummoningBlock();
+
+            // 4. 清理 Boss 条
+            this.shieldBossBar.clearPlayers();
+            this.healthBossBar.clearPlayers();
+        }
+    }
+    private void sendDeathTitleToPlayers(ServerWorld world) {
+        Text titleText = Text.translatable("title.psychosis.goddess_defeated").formatted(Formatting.DARK_PURPLE, Formatting.BOLD);
+        Text subtitleText = Text.translatable("subtitle.psychosis.goddess_defeated").formatted(Formatting.GRAY, Formatting.ITALIC);
+        for (ServerPlayerEntity player : world.getPlayers(p -> p.distanceTo(this) < 64)) {
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket(10, 60, 20));
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.SubtitleS2CPacket(subtitleText));
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.TitleS2CPacket(titleText));
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 40, 0, false, false));
+        }
+    }
+    private void spawnEpicDeathEffects(ServerWorld world) {
+        Vec3d pos = this.getPos().add(0, 1.5, 0);
+        world.playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.HOSTILE, 5.0F, 0.5F);
+        world.playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.ENTITY_WITHER_DEATH, SoundCategory.HOSTILE, 2.0F, 0.5F);
+        world.playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.ENTITY_WARDEN_SONIC_BOOM, SoundCategory.HOSTILE, 1.0F, 0.2F);
+        world.spawnParticles(ParticleTypes.FLASH, pos.x, pos.y, pos.z, 5, 0.1, 0.1, 0.1, 0.1);
+        world.spawnParticles(ParticleTypes.SOUL, pos.x, pos.y, pos.z, 100, 0.5, 0.5, 0.5, 0.2);
+        world.spawnParticles(ParticleTypes.END_ROD, pos.x, pos.y, pos.z, 150, 1.0, 1.0, 1.0, 0.15);
+        world.spawnParticles(ParticleTypes.REVERSE_PORTAL, pos.x, pos.y, pos.z, 200, 2.0, 2.0, 2.0, 0.05);
+        world.spawnParticles(ParticleTypes.EXPLOSION_EMITTER, pos.x, pos.y, pos.z, 1, 0, 0, 0, 1);
+    }
     private void executeBeamAndDamageLogic() {
         if (this.getWorld().isClient() || !(this.getWorld() instanceof ServerWorld serverWorld)) return;
 
@@ -732,8 +790,6 @@ public class GoddessEntity extends HostileEntity {
         final int TARGET_RANGE = COUNTER_ATTACK_RANGE;
         final double NARROW_BEAM_EXPAND = 0.1; // 极细光束的碰撞箱扩展量
 
-        // 动态获取黑暗伤害类型
-        // ⚠️ 确保 Psychosis.DARK_DAMAGE 存在
         Optional<RegistryEntry.Reference<DamageType>> darkDamageEntry = serverWorld.getRegistryManager()
                 .get(RegistryKeys.DAMAGE_TYPE)
                 .getEntry(Psychosis.DARK_DAMAGE);
@@ -804,27 +860,27 @@ public class GoddessEntity extends HostileEntity {
         }
     }
 
-    // 🔥 Boss 条更新方法 (实现独立双条)
+    // 在 GoddessEntity 的 updateBossBars 方法中
     private void updateBossBars() {
-        this.shieldBossBar.setName(this.getDisplayName());
-        this.healthBossBar.setName(this.getDisplayName());
-
-        float shieldProgress = this.currentShield / SHIELD_HEALTH;
-        float currentHealth = this.getHealth();
-        float maxHealth = this.getMaxHealth();
-        float healthProgress = currentHealth / maxHealth;
-
-        if (this.currentShield > 0) {
-            this.shieldBossBar.setPercent(shieldProgress);
-            this.shieldBossBar.setVisible(true);
-            this.healthBossBar.setPercent(1.0f);
-            this.healthBossBar.setVisible(false);
-        } else {
-            this.shieldBossBar.setPercent(0.0f);
+        if (this.isAppearing() || this.getAttackState() == AttackState.IN) {
             this.shieldBossBar.setVisible(false);
-            this.healthBossBar.setPercent(healthProgress);
-            this.healthBossBar.setVisible(true);
+            this.healthBossBar.setVisible(false);
+            return;
         }
+
+        // ⭐ 名字分配：护盾负责显示名字
+        this.shieldBossBar.setName(this.getDisplayName());
+        this.shieldBossBar.setColor(BossBar.Color.WHITE); // 对应护盾贴图
+
+        // ⭐ 血量名字设为空格，颜色设为红色
+        this.healthBossBar.setName(Text.literal(" "));
+        this.healthBossBar.setColor(BossBar.Color.RED);   // 对应血量贴图
+
+        this.shieldBossBar.setPercent(this.currentShield / SHIELD_HEALTH);
+        this.healthBossBar.setPercent(this.getHealth() / this.getMaxHealth());
+
+        this.shieldBossBar.setVisible(true);
+        this.healthBossBar.setVisible(true);
     }
 
     // --- 状态处理逻辑 ---
@@ -857,12 +913,10 @@ public class GoddessEntity extends HostileEntity {
             return;
         }
 
-        if (this.attackTimer <= 0) {
-            setParticlized(false);
-            getWorld().sendEntityStatus(this, (byte) 82);
-            attackState = AttackState.IDLE;
-            setNoGravity(false);
-        }
+        setParticlized(false);
+        getWorld().sendEntityStatus(this, (byte) 82);
+        attackState = AttackState.IDLE;
+        setNoGravity(false);
     }
 
     public void setOutState() {
@@ -1106,6 +1160,7 @@ public class GoddessEntity extends HostileEntity {
                 world.updateComparators(this.getSummoningAnchorPos(), ModBlocks.DARK_BLOCK);
             }
         }
+        this.resetSummoningBlock();
         this.shieldBossBar.clearPlayers();
         this.healthBossBar.clearPlayers();
         this.getWorld().playSound(null, this.getBlockPos(),
@@ -1202,11 +1257,12 @@ public class GoddessEntity extends HostileEntity {
     }
 
     // BossBar/NBT/Getter/Setter
+// 在 GoddessEntity.java 中修改此方法
     @Override
     public void onStartedTrackingBy(ServerPlayerEntity player) {
         super.onStartedTrackingBy(player);
-        this.shieldBossBar.addPlayer(player);
         this.healthBossBar.addPlayer(player);
+        this.shieldBossBar.addPlayer(player);
         this.updateBossBars();
     }
 
@@ -1350,29 +1406,12 @@ public class GoddessEntity extends HostileEntity {
         }
     }
 
-    public float getAppearanceProgress(float tickDelta) {
-        return Math.min(1.0f, (this.appearanceTicks + tickDelta) / (float)APPEARANCE_DURATION);
-    }
-
-    public boolean getIsPhaseTwo() { return this.isPhaseTwo; }
-
-    public int getAttackCooldownTimer() { return this.attackCooldownTimer; }
-
     public AttackState getAttackState() {
         if (this.dataTracker == null) return AttackState.IDLE;
         return AttackState.values()[this.dataTracker.get(ATTACK_STATE_TRACKED)];
     }
 
-    public int getAttackTimerSynced() {
-        if (this.dataTracker == null) return 0;
-        return this.dataTracker.get(ATTACK_TIMER_TRACKED);
-    }
-
     public Box getAttackBox() {
         return this.getBoundingBox().expand(WHIRLWIND_AOE_RANGE);
-    }
-
-    public boolean isInDamageParticleState() {
-        return this.dataTracker.get(DAMAGE_PARTICLE_TIMER_TRACKED) > 0;
     }
 }

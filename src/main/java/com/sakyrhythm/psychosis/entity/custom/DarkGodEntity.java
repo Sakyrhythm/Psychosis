@@ -95,7 +95,6 @@ public class DarkGodEntity extends HostileEntity {
         this.summoningBlockPos = pos;
     }
 
-
     // 核心字段
     private enum BossState {
         APPEARING,
@@ -158,8 +157,9 @@ public class DarkGodEntity extends HostileEntity {
     }
     @Override
     public void onDeath(DamageSource source) {
+        this.bossBar.clearPlayers();
+        this.bossBar.setVisible(false); // 确保它是不可见的
         super.onDeath(source);          // 先走原版死亡逻辑（掉落、经验、清空 BossBar 等）
-
         if (!this.getWorld().isClient) {
             // 1. 找到刷怪位置：优先用召唤方块，否则用自身位置
             BlockPos spawnPos = this.summoningBlockPos;
@@ -300,6 +300,14 @@ public class DarkGodEntity extends HostileEntity {
 
             boolean isAppearing = this.dataTracker.get(IS_APPEARING_TRACKED);
 
+            if (!isAppearing && this.summoningBlockPos != null) {
+                double distanceToBlock = this.getPos().distanceTo(Vec3d.ofCenter(this.summoningBlockPos));
+                if (distanceToBlock > 600.0) {
+                    System.out.println("[Server] Boss 距离方块太远 (>60格)，强制消失并重置。");
+                    this.disappear(); // 这个方法内部已经包含了重置方块的逻辑
+                    return;
+                }
+            }
             // ⭐ 1. 检查玩家是否在追踪范围内 (立即消失逻辑)
             //    >> 仅在非出场状态下执行此检查
             if (!isAppearing) {

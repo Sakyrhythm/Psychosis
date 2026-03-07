@@ -4,25 +4,13 @@
   "group": "psychosis",
   "key": {
     "#": {
-      "item": "psychosis:white_eye"
-    },
-    "X": {
-      "item": "minecraft:totem_of_undying"
-    },
-    "Z": {
-      "item": "minecraft:gold_block"
-    },
-    "E": {
-      "item": "minecraft:echo_shard"
-    },
-    "G": {
-      "item": "minecraft:enchanted_golden_apple"
+      "item": "psychosis:divinecloth"
     }
   },
   "pattern": [
-    "X X",
-    "G#G",
-    "EZE"
+    "# #",
+    "###",
+    "###"
   ],
   "result": {
     "count": 1,

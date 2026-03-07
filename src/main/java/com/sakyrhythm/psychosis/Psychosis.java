@@ -1,13 +1,16 @@
 package com.sakyrhythm.psychosis;
 
 import com.google.common.base.Stopwatch;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.datafixers.util.Pair;
 import com.sakyrhythm.psychosis.block.ModBlocks;
+import com.sakyrhythm.psychosis.config.ModConfig;
 import com.sakyrhythm.psychosis.entity.ModEntities;
-import com.sakyrhythm.psychosis.entity.custom.PlayerEntity;
-import com.sakyrhythm.psychosis.entity.custom.ScytheBossEntity;
+import com.sakyrhythm.psychosis.entity.client.DegenerateWitherModel;
+import com.sakyrhythm.psychosis.entity.custom.*;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
@@ -16,6 +19,7 @@ import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.item.ModArmorItems;
 import com.sakyrhythm.psychosis.item.ModItemGroups;
 import com.sakyrhythm.psychosis.item.ModItems;
+import com.sakyrhythm.psychosis.item.UmbrellaItem;
 import com.sakyrhythm.psychosis.mixin.PlayerMixin;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
@@ -61,6 +65,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 public class Psychosis implements ModInitializer {
@@ -118,6 +123,7 @@ public class Psychosis implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModConfig.load();
 		ModNetworking.register();
 		// ************************************************************
 		// 服务器 Tick 事件: 处理延迟卸载任务
@@ -144,9 +150,9 @@ public class Psychosis implements ModInitializer {
 		// ************************************************************
 		FabricDefaultAttributeRegistry.register(ModEntities.SCYTHE, ScytheBossEntity.createScytheBossAttributes());
 		FabricDefaultAttributeRegistry.register(ModEntities.PLAYER, PlayerEntity.createPlayerAttributes());
-		FabricDefaultAttributeRegistry.register(ModEntities.DEGENERATEWITHER, PlayerEntity.createPlayerAttributes());
-		FabricDefaultAttributeRegistry.register(ModEntities.DARK_GOD, PlayerEntity.createPlayerAttributes());
-		FabricDefaultAttributeRegistry.register(ModEntities.GODDESS,PlayerEntity.createPlayerAttributes());
+		FabricDefaultAttributeRegistry.register(ModEntities.DEGENERATEWITHER, DWitherEntity.createDegenerateWitherAttributes());
+		FabricDefaultAttributeRegistry.register(ModEntities.DARK_GOD, DarkGodEntity.createDarkGodAttributes());
+		FabricDefaultAttributeRegistry.register(ModEntities.GODDESS, GoddessEntity.createGoddessBossAttributes());
 
 		// ************************************************************
 		// 状态效果注册
@@ -271,46 +277,10 @@ public class Psychosis implements ModInitializer {
 		// ************************************************************
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(literal("psychosis")
-					// 1. 测试伤害命令
-					.then(literal("test-damage")
-							.requires((source) -> source.hasPermissionLevel(2))
-							.executes(context -> {
-								ServerCommandSource source = context.getSource();
-								ServerPlayerEntity player = source.getPlayer();
-								if (player == null) {
-									source.sendError(Text.literal("只有玩家可以执行此命令"));
-									return 0;
-								}
-								DamageSource damageSource = player.getDamageSources().generic();
-								try {
-									// 强制转换为 Mixin 接口
-									IPlayerEntity playerInterface = (IPlayerEntity) player;
-									playerInterface.setNoticed(true);
-									for (int i = 0; i < 10; i++) {
-										// 玩家伤害，注意这里使用了 generic 伤害类型
-										player.damage(damageSource, 1.0f);
-										player.sendMessage(Text.literal("造成伤害 #" + (i + 1)), false);
-									}
-									source.sendFeedback(() -> Text.literal("已成功造成10次无冷却伤害"), false);
-									return 1;
-								} catch (Exception e) {
-									LOGGER.error("在测试伤害命令中发生意外错误", e);
-									source.sendError(Text.literal("命令执行失败: " + e.getMessage()));
-									return -1;
-								}
-							})
-					)
-					// 2. 定位命令
-					.then(literal("locate")
-							.then(literal("dark")
-									.requires((source) -> source.hasPermissionLevel(2))
-									.executes(context -> executeLocateDarkStructure(context.getSource()))
-							)
-					)
-					// 3. 查询 DarkEffect 状态命令
+					// 2. 查询 DarkEffect 状态命令 (修改为所有人可用)
 					.then(literal("status")
 							.then(literal("dark")
-									.requires((source) -> source.hasPermissionLevel(0))
+									.requires((source) -> true) // 所有人均可执行
 									.executes(context -> {
 										ServerCommandSource source = context.getSource();
 										ServerPlayerEntity player = source.getPlayer();
@@ -326,20 +296,69 @@ public class Psychosis implements ModInitializer {
 										int duration = darkInfo[1];
 
 										if (level > 0) {
-											double durationSeconds = (double) duration / 20.0;
+											// 1. 构建基础信息文本（等级部分）
+											var feedback = Text.literal("✅ DarkEffect 状态: 等级 ")
+													.append(Text.literal(String.valueOf(level)).withColor(0xFF00FF))
+													.append(Text.literal(", 剩余时间: "));
 
-											source.sendFeedback(() ->
-															Text.literal("✅ DarkEffect 状态: 等级 ")
-																	.append(Text.literal(String.valueOf(level)).withColor(0xFF00FF))
-																	.append(Text.literal(", 剩余时间: "))
-																	.append(Text.literal(String.format("%.1f", durationSeconds) + " 秒").withColor(0x00FFFF)),
-													false);
+											// 2. 核心逻辑：判断是否为 -1 (无限)
+											if (duration == -1) {
+												feedback.append(Text.literal("无限").withColor(0x00FFFF));
+											} else {
+												// 正常显示秒数（防止负数导致显示异常，通常 duration > 0）
+												double durationSeconds = Math.max(0, (double) duration / 20.0);
+												feedback.append(Text.literal(String.format("%.1f", durationSeconds) + " 秒").withColor(0x00FFFF));
+											}
+
+											source.sendFeedback(() -> feedback, false);
 											return 1;
 										} else {
 											source.sendFeedback(() -> Text.literal("❌ DarkEffect 不存在于你身上。").withColor(0xFF0000), false);
 											return 0;
 										}
 									})
+							)
+					)
+					.then(literal("config")
+							.requires(source -> true)
+							.then(literal("rainSlowness")
+									// 情况 A: 查询当前配置 (私发)
+									.executes((CommandContext<ServerCommandSource> context) -> {
+										boolean current = ModConfig.enableRainSlowness;
+										context.getSource().sendFeedback(() ->
+												Text.literal("§a[Psychosis] §r雨天减速当前状态: " + (current ? "§2开启" : "§4关闭")), false);
+										return 1;
+									})
+									// 情况 B: 尝试修改配置
+									.then(argument("enabled", BoolArgumentType.bool())
+											.requires(source -> source.hasPermissionLevel(2)) // 仅 OP 可修改
+											.executes((CommandContext<ServerCommandSource> context) -> {
+												boolean newValue = BoolArgumentType.getBool(context, "enabled");
+												boolean oldValue = ModConfig.enableRainSlowness;
+
+												// --- 逻辑判断：如果设置的值与当前值相同 ---
+												if (newValue == oldValue) {
+													context.getSource().sendFeedback(() ->
+															Text.literal("§e[Psychosis] §6雨天减速当前已经是 §r" +
+																	(oldValue ? "§2开启" : "§4关闭") + " §6状态，无需修改。"), false); // 仅发给本人
+													return 1;
+												}
+
+												// --- 逻辑判断：如果值发生了改变 ---
+												ModConfig.enableRainSlowness = newValue;
+												ModConfig.save();
+
+												// 构造全服公告
+												Text broadcastMsg = Text.literal("§a[Psychosis] §e管理员 §f" +
+														context.getSource().getName() + " §e已将全服雨天减速设置为: " +
+														(newValue ? "§2开启" : "§4关闭"));
+
+												// 广播给所有人
+												context.getSource().getServer().getPlayerManager().broadcast(broadcastMsg, false);
+
+												return 1;
+											})
+									)
 							)
 					)
 			);

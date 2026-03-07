@@ -4,22 +4,13 @@
   "group": "psychosis",
   "key": {
     "#": {
-      "item": "psychosis:white_eye"
-    },
-    "X": {
-      "item": "minecraft:golden_boots"
-    },
-    "Y": {
-      "item": "minecraft:gold_nugget"
-    },
-    "Z": {
-      "item": "minecraft:gold_block"
+      "item": "psychosis:divinecloth"
     }
   },
   "pattern": [
-    " # ",
-    "ZXZ",
-    "Y Y"
+    "   ",
+    "# #",
+    "# #"
   ],
   "result": {
     "count": 1,

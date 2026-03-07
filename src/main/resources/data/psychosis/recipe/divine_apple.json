@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "psychosis",
+  "key": {
+    "X": {
+      "item": "minecraft:enchanted_golden_apple"
+    },
+    "Z": {
+      "item": "psychosis:white_eye"
+    }
+  },
+  "pattern": [
+    "ZZZ",
+    "ZXZ",
+    "ZZZ"
+  ],
+  "result": {
+    "count": 1,
+    "id": "psychosis:divine_apple"
+  }
+}

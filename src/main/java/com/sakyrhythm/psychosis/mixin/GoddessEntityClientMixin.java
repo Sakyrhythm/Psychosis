@@ -1,13 +1,11 @@
 package com.sakyrhythm.psychosis.mixin;
 
 import com.sakyrhythm.psychosis.entity.custom.GoddessEntity;
-import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.particle.SimpleParticleType;
 import net.minecraft.world.World;
 import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Mixin;

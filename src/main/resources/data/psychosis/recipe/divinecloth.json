@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "psychosis:void_essence"
+  },
+  "base": {
+    "item": "minecraft:paper"
+  },
+  "addition": {
+    "item": "minecraft:gold_ingot"
+  },
+  "result": {
+    "id": "psychosis:divinecloth"
+  }
+}

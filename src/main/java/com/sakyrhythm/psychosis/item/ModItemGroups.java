@@ -21,6 +21,7 @@ public class ModItemGroups {
                         entries.add(ModBlocks.DARK_DIRT);
                         entries.add(ModBlocks.DARK_BLOCK); // Use add for a single block
                         entries.add(ModItems.VOID_ESSENCE);
+                        entries.add(ModItems.DIVINECLOTH);
                         entries.add(ModItems.Dark_EYE);
                         entries.add(ModItems.NoticedBottle);
                         entries.add(ModItems.White_EYE);
@@ -31,6 +32,7 @@ public class ModItemGroups {
                         entries.add(ModItems.HAPPYCANDY);
                         entries.add(ModItems.DIVINE_APPLE);
                         entries.add(ModItems.DARKSWORD);
+                        entries.add(ModItems.UMBRELLA);
                     }).build());
 
     public static void registerModItemGroups() {

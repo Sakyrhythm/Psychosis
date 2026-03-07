@@ -3,6 +3,7 @@ package com.sakyrhythm.psychosis;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.client.*;
 import com.sakyrhythm.psychosis.entity.client.feature.CorrosionFeatureRenderer;
+import com.sakyrhythm.psychosis.item.UmbrellaItem;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
@@ -82,6 +83,7 @@ public class PsychosisModClient implements ClientModInitializer {
                 registrationHelper.register(new CorrosionFeatureRenderer((PlayerEntityRenderer) entityRenderer));
             }
         });
+        UmbrellaItem.registerModelPredicate();
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_STEVE, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,false),64,64));
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_SLIM, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,true),64,64));
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);

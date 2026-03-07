@@ -10,6 +10,7 @@
   "item.psychosis.divine_leggings": "Divine Wraps",
   "item.psychosis.divine_boots": "Divine Sandals",
   "block.psychosis.dark_portal_frame": "The Dark Pylon",
+  "block.psychosis.whispering_shell": "Whispering Shell",
   "block.psychosis.dark_stone": "Fouled Stone",
   "block.psychosis.dark_dirt": "Blighted Earth",
   "block.psychosis.dark_cobblestone": "Fissured Fouled Stone",
@@ -44,5 +45,9 @@
   "entity.psychosis.dark_god": "Hades' Lingering Will",
   "entity.psychosis.goddess": "Valkyrie of the Void",
   "entity.psychosis.scythe": "Reaper",
-  "entity.psychosis.nail": "Bane"
+  "entity.psychosis.nail": "Bane",
+  "item.psychosis.umbrella": "Umbrella",
+  "item.psychosis.divinecloth": "Divine Cloth",
+  "subtitle.psychosis.goddess_defeated": "未完待续……",
+  "title.psychosis.goddess_defeated": "虚空女神已被击败！"
 }
