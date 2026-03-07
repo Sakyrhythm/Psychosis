@@ -16,32 +16,62 @@ import java.util.List;
 
 public class WhisperingShellBlockEntity extends BlockEntity {
     private int cooldown = 0;
+    private int cleanupTimer = 0;
 
     public WhisperingShellBlockEntity(BlockPos pos, BlockState state) {
         super(ModEntities.WHISPERING_SHELL_BE, pos, state);
     }
 
-    // 在 WhisperingShellBlockEntity.java 中修改 tick 逻辑
     public static void tick(World world, BlockPos pos, BlockState state, WhisperingShellBlockEntity be) {
         if (world.isClient) return;
+
+        // 🎯 1. 定期清理无法追踪的标签 (每秒一次)
+        if (++be.cleanupTimer >= 10) {
+            be.cleanupTimer = 0;
+            cleanupOrphanedTags(world, pos);
+        }
 
         if (be.cooldown > 0) {
             be.cooldown--;
             return;
         }
 
+        // 🎯 2. 扫描逻辑：修复玩家锁定
         Box scanBox = new Box(pos).expand(6.0);
         List<LivingEntity> targets = world.getEntitiesByClass(LivingEntity.class, scanBox,
-                e -> e.isAlive()
-                        && !e.isSpectator()
-                        && !e.getCommandTags().contains("has_tentacle") // 🎯 关键：检查标签
-                        && !(e instanceof PlayerEntity && ((PlayerEntity)e).isCreative()));
+                e -> {
+                    if (!e.isAlive() || e.isSpectator()) return false;
+                    // 如果是玩家，排除创造模式
+                    if (e instanceof PlayerEntity player && player.isCreative()) return false;
+                    // 检查标签
+                    return !e.getCommandTags().contains("has_tentacle");
+                });
 
         if (!targets.isEmpty()) {
-            be.cooldown = 200; // 锁定后较长的冷却
+            be.cooldown = 0;
             for (LivingEntity target : targets) {
-                target.addCommandTag("has_tentacle"); // 🎯 关键：锁定目标
+                target.addCommandTag("has_tentacle");
                 spawnChain(world, pos, target);
+            }
+        }
+    }
+
+    /**
+     * 🎯 安全机制：清理丢失触手的生物标签
+     */
+    private static void cleanupOrphanedTags(World world, BlockPos pos) {
+        Box safetyBox = new Box(pos).expand(15.0);
+        List<LivingEntity> entities = world.getEntitiesByClass(LivingEntity.class, safetyBox,
+                e -> e.getCommandTags().contains("has_tentacle"));
+
+        for (LivingEntity entity : entities) {
+            // 在附近寻找属于该实体的触手
+            List<TentacleEntity> tentacles = world.getEntitiesByClass(TentacleEntity.class, safetyBox,
+                    t -> entity.getUuid().equals(t.getTargetUuid()));
+
+            // 如果附近没有触手在抓它，强制清除标签
+            if (tentacles.isEmpty()) {
+                entity.removeCommandTag("has_tentacle");
             }
         }
     }
@@ -50,10 +80,8 @@ public class WhisperingShellBlockEntity extends BlockEntity {
         Vec3d start = Vec3d.ofCenter(pos);
         double dist = start.distanceTo(target.getPos());
 
-        // 🎯 3倍加密：原本每 0.5 格一节，现在每 0.15 格一节
-        // 这样 6 格的长度需要约 40 节，再加上 20 节用于致密缠绕
         int count = (int) Math.ceil(dist / 0.15) + 25;
-        count = MathHelper.clamp(count, 45, 60); // 确保总节数在 45 到 60 之间
+        count = MathHelper.clamp(count, 45, 60);
 
         Entity last = null;
         for (int i = 0; i < count; i++) {
