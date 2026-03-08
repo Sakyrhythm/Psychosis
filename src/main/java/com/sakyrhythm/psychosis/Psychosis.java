@@ -9,34 +9,42 @@ import com.mojang.datafixers.util.Pair;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.config.ModConfig;
 import com.sakyrhythm.psychosis.entity.ModEntities;
-import com.sakyrhythm.psychosis.entity.client.DegenerateWitherModel;
 import com.sakyrhythm.psychosis.entity.custom.*;
 import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
 import com.sakyrhythm.psychosis.entity.effect.VulnerableEffect;
 import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
-import com.sakyrhythm.psychosis.item.ModArmorItems;
-import com.sakyrhythm.psychosis.item.ModItemGroups;
-import com.sakyrhythm.psychosis.item.ModItems;
-import com.sakyrhythm.psychosis.item.UmbrellaItem;
-import com.sakyrhythm.psychosis.mixin.PlayerMixin;
+import com.sakyrhythm.psychosis.item.*;
+import com.sakyrhythm.psychosis.networking.LeftClickC2SPayload;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Block;
-import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.effect.StatusEffect;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
@@ -46,6 +54,8 @@ import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -56,6 +66,8 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.gen.structure.Structure;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +137,27 @@ public class Psychosis implements ModInitializer {
 	public void onInitialize() {
 		ModConfig.load();
 		ModNetworking.register();
-		// ************************************************************
+		PayloadTypeRegistry.playC2S().register(LeftClickC2SPayload.ID, LeftClickC2SPayload.CODEC);
+
+		// 注册服务端 Payload 接收器
+		ServerPlayNetworking.registerGlobalReceiver(LeftClickC2SPayload.ID, (payload, context) -> {
+			Psychosis.LOGGER.info("Received left click packet on server from player: {}", context.player().getName().getString());
+
+			context.server().execute(() -> {
+				ServerPlayerEntity player = context.player();
+				String source = payload.source();
+
+				Psychosis.LOGGER.info("Processing left click for player: {}, source: {}", player.getName().getString(), source);
+
+				ItemStack stack = player.getMainHandStack();
+				if (stack.getItem() instanceof DarkSwordItem darkSword) {
+					Psychosis.LOGGER.info("Calling handleAnyLeftClick on DarkSwordItem");
+					darkSword.handleAnyLeftClick(stack, player, null, source);
+				} else {
+					Psychosis.LOGGER.info("Player not holding DarkSwordItem, holding: {}", stack.getItem());
+				}
+			});
+		});
 		// 服务器 Tick 事件: 处理延迟卸载任务
 		// ************************************************************
 		ServerTickEvents.END_SERVER_TICK.register(server -> {

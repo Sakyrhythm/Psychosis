@@ -17,9 +17,6 @@ import org.joml.Quaternionf;
 
 public class FlatDartRenderer extends EntityRenderer<FlatDartProjectile> {
 
-    // 投射物的平面模型将借用这个物品的渲染，请确保这个物品的 Item Model 是一个单面平面！
-    // 假设您制作了一个 Item Model 文件来代表您的平面贴图，
-    // 您应该替换 Items.SHULKER_SHELL 为该物品的实例。
     private final ItemStack DART_STACK = new ItemStack(ModItems.FLAT_DART);
 
     public FlatDartRenderer(EntityRendererFactory.Context context) {

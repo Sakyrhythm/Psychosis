@@ -40,7 +40,7 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
     );
     private static final float BASE_DAMAGE = 6.0F; // 基础伤害
     private static final float DAMAGE_PER_DARK_LEVEL = 2.0F; // 每级黑暗效果提供的额外伤害
-    private static final int MAX_LIFE_TICKS = 20; // 存活时间 1 秒
+    private static final int MAX_LIFE_TICKS = 60; // 存活时间 1 秒
 
     // --- 状态 ---
     private final Set<Entity> hitEntities = new HashSet<>(); // 记录已击中实体，实现单次伤害穿透
@@ -180,12 +180,6 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
                 }
             }
 
-            // 【TODO：这里可以加入 Boss Counter 的伤害计算逻辑】
-            if (isBossCounter && target == bossOwner) {
-                // finalDamage += target.getMaxHealth() * counterDamagePercent;
-                // ... 施加更高强度的 dark 效果 ...
-            }
-
             // 2. 施加伤害
             // 使用 Arrow 伤害源，但来源是剑气（投射物），归属于射击者
             DamageSource src = this.getDamageSources().arrow(this, shooter);
@@ -211,6 +205,16 @@ public class FlatDartProjectile extends PersistentProjectileEntity {
     // =================================================================================
     // 其他方法
     // =================================================================================
+    @Override
+    public boolean isNoClip() {
+        return true; // 始终穿墙
+    }
+
+    @Override
+    protected void onBlockHit(net.minecraft.util.hit.BlockHitResult blockHitResult) {
+        // 完全覆盖方块碰撞，什么都不做（剑气穿墙）
+        // 不调用 super.onBlockHit()
+    }
 
     // 覆盖 canHit，允许击中 LivingEntity (且非拥有者)
     @Override

@@ -427,29 +427,43 @@ public class DarkSwordItem extends SwordItem {
         world.spawnEntity(dart);
     }
 
+
     // =========================================================================================
     // 左键发射剑气逻辑 (launchSingleFlatProjectile) (已修改音效为 ENTITY_WITHER_SHOOT)
     // =========================================================================================
-
     private void launchSingleFlatProjectile(ServerWorld world, PlayerEntity player, ItemStack stack, Hand hand) {
         LOGGER.info("Launching a single FlatDartProjectile (Sword Wave).");
 
-        float eyeHeight = player.getEyeHeight(EntityPose.STANDING);
-        // 关键点：创建 FlatDartProjectile (剑气实体)
+        // 创建剑气实体
         FlatDartProjectile dart = new FlatDartProjectile(world, player, stack, hand);
 
-        float targetPitch = player.getPitch();
-        float targetYaw = player.getYaw();
+        // 获取玩家面向的方向（完全不考虑玩家速度）
+        Vec3d lookDirection = Vec3d.fromPolar(player.getPitch(), player.getYaw()).normalize();
 
         // 在玩家眼睛高度附近生成剑气
-        dart.setPosition(player.getX(), player.getY() + eyeHeight - 0.1f, player.getZ());
+        float eyeHeight = player.getEyeHeight(EntityPose.STANDING);
 
-        // 设置剑气的速度和方向 (确保直线飞行)
-        dart.setVelocity(player, targetPitch, targetYaw, 0.0F, 1.8F, 1.0F);
+        // 将生成位置向前移动一小段距离，避免与玩家碰撞
+        double spawnOffset = 0.5;
+        Vec3d spawnPos = player.getEyePos().add(lookDirection.multiply(spawnOffset));
+
+        // 设置剑气位置
+        dart.setPosition(spawnPos.x, spawnPos.y - 0.1, spawnPos.z);
+
+        // 基础速度 - 固定值，不受玩家速度影响
+        double baseSpeed = 2.2;
+
+        // 设置剑气速度 - 只使用看向的方向
+        dart.setVelocity(lookDirection.x * baseSpeed,
+                lookDirection.y * baseSpeed,
+                lookDirection.z * baseSpeed);
+
+        // 设置伤害
         dart.setDamage(6.0);
+
         world.spawnEntity(dart);
 
-        // 【音效已更改】：使用 ENTITY_WITHER_SHOOT
+        // 播放音效
         world.playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.ENTITY_WITHER_SHOOT,
                 SoundCategory.PLAYERS, 1.0F, 0.8F + world.random.nextFloat() * 0.4F);
@@ -653,6 +667,115 @@ public class DarkSwordItem extends SwordItem {
             }
         }
         return super.postHit(stack, target, attacker);
+    }
+    // 在 DarkSwordItem.java 中添加这个方法
+    /**
+     * 统一的左键点击处理逻辑
+     * 在所有左键点击事件中调用（攻击实体、挖掘方块、点空、GUI点击等）
+     */
+    public void handleAnyLeftClick(ItemStack stack, PlayerEntity player, @Nullable Entity target, String clickSource) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof DarkSwordItem)) return;
+        if (player.getWorld().isClient()) return; // 只在服务端执行逻辑
+
+        ServerWorld world = (ServerWorld) player.getWorld();
+        boolean isAnchored = isSwordAnchored(stack);
+
+        LOGGER.info("Left click triggered from: {} with target: {}, isAnchored: {}",
+                clickSource, target != null ? target.getName().getString() : "none", isAnchored);
+
+        if (isAnchored) {
+            // === 锚定状态下的左键逻辑 ===
+
+            // --- 1. 如果目标是实体，施加黑暗纠缠效果 ---
+            if (target instanceof LivingEntity livingTarget) {
+                RegistryKey<StatusEffect> darkEffectKey =
+                        RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "dark"));
+
+                Optional<RegistryEntry.Reference<StatusEffect>> darkEffectEntry =
+                        world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).getEntry(darkEffectKey);
+
+                if (darkEffectEntry.isPresent()) {
+                    // 检查目标实体是否已经拥有该效果
+                    if (!livingTarget.hasStatusEffect(darkEffectEntry.get())) {
+                        final int DURATION_TICKS = 10; // 0.5 秒
+                        StatusEffectInstance darkEntanglement = new StatusEffectInstance(
+                                darkEffectEntry.get(),
+                                DURATION_TICKS,
+                                0, // Amplifier 0 = Level 1
+                                false,
+                                false,
+                                false
+                        );
+                        livingTarget.addStatusEffect(darkEntanglement);
+                        LOGGER.info("Applied Dark Entanglement ({} ticks) to {} due to anchored left click.",
+                                DURATION_TICKS, livingTarget.getName().getString());
+                    } else {
+                        LOGGER.info("{} already has Dark Entanglement. Skipping reapplication on left click.",
+                                livingTarget.getName().getString());
+                    }
+                }
+            } else {
+                LOGGER.info("Left click target is not a LivingEntity or is null. Target: {}", target);
+            }
+
+            // 2. 发射单道剑气 (FlatDartProjectile)
+            Hand hand = player.getMainHandStack() == stack ? Hand.MAIN_HAND : Hand.OFF_HAND;
+            launchSingleFlatProjectile(world, player, stack, hand);
+
+            // 3. 解除锚定逻辑
+            disengageAnchorAndSync(stack, player, null);
+            LOGGER.info("Disengaging anchor due to left click (No health restoration).");
+
+            // 4. 应用冷却 - 注意这里是 this 指向 DarkSwordItem 实例
+            player.getItemCooldownManager().set(this, 10); // 0.5 秒冷却
+
+            // 5. 播放左键锚定攻击音效 - 修正参数数量
+            world.playSound(
+                    null,                       // PlayerEntity - 为null表示所有玩家都能听到
+                    player.getX(),               // double x
+                    player.getY(),               // double y
+                    player.getZ(),               // double z
+                    SoundEvents.ENTITY_WITHER_SHOOT, // SoundEvent sound
+                    SoundCategory.PLAYERS,       // SoundCategory category
+                    0.8F,                        // float volume
+                    0.8F + world.random.nextFloat() * 0.4F // float pitch
+            );
+
+        } else {
+            // === 非锚定状态下的左键逻辑 ===
+            if (target instanceof LivingEntity livingTarget) {
+                // 可以有概率施加短暂的效果
+                if (player.getWorld().random.nextFloat() < 0.1f) { // 10%几率
+                    RegistryKey<StatusEffect> darkEffectKey =
+                            RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "dark"));
+
+                    Optional<RegistryEntry.Reference<StatusEffect>> darkEffectEntry =
+                            world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).getEntry(darkEffectKey);
+
+                    if (darkEffectEntry.isPresent()) {
+                        livingTarget.addStatusEffect(new StatusEffectInstance(
+                                darkEffectEntry.get(),
+                                5, // 短暂效果
+                                0,
+                                false,
+                                false,
+                                true
+                        ));
+                        LOGGER.info("Applied brief Dark Entanglement to {} from unanchored hit (10% chance).",
+                                livingTarget.getName().getString());
+                    }
+                }
+            }
+
+            // 非锚定状态下添加粒子效果
+            if (player.getWorld() instanceof ServerWorld serverWorld) {
+                serverWorld.spawnParticles(
+                        ParticleTypes.SMOKE,
+                        player.getX(), player.getY() + 1.0, player.getZ(),
+                        5, 0.5, 0.5, 0.5, 0.0
+                );
+            }
+        }
     }
 
     // =========================================================================================

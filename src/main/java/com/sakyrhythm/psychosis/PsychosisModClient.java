@@ -3,11 +3,15 @@ package com.sakyrhythm.psychosis;
 import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.entity.client.*;
 import com.sakyrhythm.psychosis.entity.client.feature.CorrosionFeatureRenderer;
+import com.sakyrhythm.psychosis.item.DarkSwordItem;
 import com.sakyrhythm.psychosis.item.UmbrellaItem;
+import com.sakyrhythm.psychosis.networking.LeftClickC2SPayload;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
@@ -15,54 +19,53 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.model.Dilation;
 import net.minecraft.client.model.TexturedModelData;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)
 public class PsychosisModClient implements ClientModInitializer {
 
-    private static void spawnBeamParticles(World world, double startX, double startY, double startZ, double endX, double endY, double endZ) {
-        // 调试语句 (如果需要)
-        // System.out.println("DEBUG (Client): Starting high-density particle beam.");
+    // 用于检测按键状态
+    private boolean wasAttackKeyPressed = false;
+    private long lastClickTime = 0;
 
+    private static void spawnBeamParticles(World world, double startX, double startY, double startZ, double endX, double endY, double endZ) {
         Vec3d start = new Vec3d(startX, startY, startZ);
         Vec3d end = new Vec3d(endX, endY, endZ);
         Vec3d delta = end.subtract(start);
         double distance = delta.length();
 
-        // 💥 关键修改：极高密度，创建实心感
         double particlesPerBlock = 30.0;
         int numParticles = (int)(distance * particlesPerBlock);
 
         for (int i = 0; i <= numParticles; i++) {
             double t = (double)i / numParticles;
 
-            // 计算当前粒子位置 (插值)
             double currentX = startX + delta.x * t;
             double currentY = startY + delta.y * t;
             double currentZ = startZ + delta.z * t;
 
-            // 💥 发射粒子
             world.addParticle(
-                    ParticleTypes.ELECTRIC_SPARK, // 选择一种细小且发光的粒子
+                    ParticleTypes.ELECTRIC_SPARK,
                     currentX,
                     currentY,
                     currentZ,
-                    0.0, 0.0, 0.0 // 速度必须为零，确保粒子停留在轨迹线上
+                    0.0, 0.0, 0.0
             );
         }
     }
+
     @Override
     public void onInitializeClient() {
-        ModNetworking.registerClientReceiver(payload -> { // 修正：回调只接收 payload 对象
+        System.out.println("========== PsychosisModClient INITIALIZED ==========");
 
-            // 在主线程执行粒子生成
-            // 使用 MinecraftClient.getInstance() 获取客户端实例
-                 MinecraftClient client = MinecraftClient.getInstance();
-
+        // 注册网络接收器
+        ModNetworking.registerClientReceiver(payload -> {
+            MinecraftClient client = MinecraftClient.getInstance();
             client.execute(() -> {
-                // 修正：直接从 payload 对象中获取数据 (使用 record 的 getter 方法)
                 double startX = payload.startX();
                 double startY = payload.startY();
                 double startZ = payload.startZ();
@@ -70,21 +73,75 @@ public class PsychosisModClient implements ClientModInitializer {
                 double endY = payload.endY();
                 double endZ = payload.endZ();
 
-                // 修正：使用 client.world 获取当前客户端世界实例
-                // 确保 client.world 不为空 (玩家已进入世界)
                 if (client.world != null) {
                     spawnBeamParticles(client.world, startX, startY, startZ, endX, endY, endZ);
                 }
             });
         });
+
         // 注册实体渲染器
         LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
             if (entityRenderer instanceof PlayerEntityRenderer) {
                 registrationHelper.register(new CorrosionFeatureRenderer((PlayerEntityRenderer) entityRenderer));
             }
         });
+
+        // ========== 关键修复：添加 GUI 状态检查 ==========
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.player == null) return;
+
+            // 检查是否在 GUI 中
+            boolean isInGui = client.currentScreen != null;
+
+            if (!isInGui) {
+                boolean isAttackPressed = GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_1) == GLFW.GLFW_PRESS;
+                if (isAttackPressed && !wasAttackKeyPressed) {
+                    handleInGameAttack(client);
+                }
+                wasAttackKeyPressed = isAttackPressed;
+            } else {
+                // 在 GUI 中时重置状态
+                wasAttackKeyPressed = false;
+            }
+        });
+
+        // 注册所有模型和渲染器
+        registerModelsAndRenderers();
+    }
+
+    private void handleInGameAttack(MinecraftClient client) {
+        if (client.player == null) return;
+
+        // 防抖：防止同一帧多次触发
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastClickTime < 50) return;
+        lastClickTime = currentTime;
+
+        ItemStack mainHand = client.player.getMainHandStack();
+
+        // 只有手持黑暗剑时才处理
+        if (mainHand.getItem() instanceof DarkSwordItem) {
+            // 发送数据包到服务端
+            sendLeftClickPacket();
+
+            // 客户端特效（可选）
+            client.particleManager.addEmitter(
+                    client.player,
+                    ParticleTypes.SWEEP_ATTACK,
+                    3
+            );
+
+            System.out.println("In-game attack detected with Dark Sword!");
+        }
+    }
+
+    private void sendLeftClickPacket() {
+        ClientPlayNetworking.send(new LeftClickC2SPayload("attack_key"));
+        Psychosis.LOGGER.debug("Sent left click packet from client");
+    }
+
+    private void registerModelsAndRenderers() {
         UmbrellaItem.registerModelPredicate();
-        EntityRendererRegistry.register(ModEntities.FALLEN_SWORD, FallenSwordEntityRenderer::new);
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_STEVE, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,false),64,64));
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_SLIM, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,true),64,64));
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);
@@ -98,35 +155,13 @@ public class PsychosisModClient implements ClientModInitializer {
         EntityRendererRegistry.register(ModEntities.SCYTHE, ScytheRenderer::new);
         EntityRendererRegistry.register(ModEntities.TENTACLE, TentacleEntityRenderer::new);
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.TENTACLE, TentacleModel::getTexturedModelData);
-        EntityModelLayerRegistry.registerModelLayer(
-                ModModelLayers.MODEL_WHIRLWIND_SLASH, // <-- 使用新的/正确的 ID
-                WhirlwindSlashModel::getTexturedModelData // <-- 绑定刀光自己的模型数据
-        );
-        // 3. 关键一步：将你的单头模型数据注册到自定义的模型层上
-        EntityModelLayerRegistry.registerModelLayer(
-                ModModelLayers.MODEL_DEGENERATE_WITHER_LAYER,
-                DegenerateWitherModel::getTexturedModelData
-        );
-        EntityModelLayerRegistry.registerModelLayer(
-                ModModelLayers.DARK_GOD_MODEL_LAYER,
-                DarkGodModel::getTexturedModelData
-        );
-        EntityModelLayerRegistry.registerModelLayer(
-                ModModelLayers.NAIL,
-                NailModel::getTexturedModelData
-        );
-        EntityModelLayerRegistry.registerModelLayer(
-                ModModelLayers.SCYTHE,
-                ScytheModel::getTexturedModelData
-        );
-
-        // 2. 注册渲染器：将实体类型和粒子渲染逻辑关联起来
-        EntityRendererRegistry.register(
-                ModEntities.DARK_GOD,
-                DarkGodRenderer::new
-        );
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.MODEL_WHIRLWIND_SLASH, WhirlwindSlashModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.MODEL_DEGENERATE_WITHER_LAYER, DegenerateWitherModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.DARK_GOD_MODEL_LAYER, DarkGodModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.NAIL, NailModel::getTexturedModelData);
+        EntityModelLayerRegistry.registerModelLayer(ModModelLayers.SCYTHE, ScytheModel::getTexturedModelData);
+        EntityRendererRegistry.register(ModEntities.DARK_GOD, DarkGodRenderer::new);
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.GODDESS,GoddessModel::getTexturedModelData);
         EntityRendererRegistry.register(ModEntities.GODDESS, GoddessRenderer::new);
-
     }
 }
