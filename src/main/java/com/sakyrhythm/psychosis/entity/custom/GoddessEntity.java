@@ -3,6 +3,7 @@ package com.sakyrhythm.psychosis.entity.custom;
 import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.block.DarkPortalFrameBlock;
 import com.sakyrhythm.psychosis.block.ModBlocks;
+import com.sakyrhythm.psychosis.entity.ModEntities;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
 import net.minecraft.block.BlockState;
@@ -445,7 +446,8 @@ public class GoddessEntity extends HostileEntity {
                 .matchesKey(SHADOW_DAMAGE_KEY);
     }
     private static boolean isDamageSourceMagic(DamageSource src) {
-        return src.isOf(net.minecraft.entity.damage.DamageTypes.MAGIC);
+        return src.isOf(net.minecraft.entity.damage.DamageTypes.MAGIC) ||
+                src.isOf(net.minecraft.entity.damage.DamageTypes.INDIRECT_MAGIC);
     }
 
     /* --------------------------------------------------------------------- */
@@ -625,11 +627,16 @@ public class GoddessEntity extends HostileEntity {
         getSummoningAnchorPos();
 
         if (!this.getWorld().isClient()) {
+            if (!this.isAppearing() && this.summoningBlockPos != null) {
+                double distanceToBlock = this.getPos().distanceTo(Vec3d.ofCenter(this.summoningBlockPos));
+                if (distanceToBlock > 600.0) {
+                    this.disappear();
+                    return;
+                }
+            }
             if (!this.isAppearing()) {
                 PlayerEntity closestPlayer = this.getWorld().getClosestPlayer(this, this.getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE));
-
                 if (closestPlayer == null) {
-                    this.resetSummoningBlock();
                     this.disappear();
                     return;
                 }
@@ -744,6 +751,35 @@ public class GoddessEntity extends HostileEntity {
         if (!this.getWorld().isClient) {
             ServerWorld serverWorld = (ServerWorld) this.getWorld();
             BlockPos deathPos = this.getBlockPos();
+            BlockPos targetPos = this.getSummoningAnchorPos();
+
+            Vec3d centerOfBlock = Vec3d.ofCenter(targetPos);
+
+            // 1. 在方块处产生“死亡之光”特效 (模拟龙死亡)
+            // 产生冲天光柱粒子
+            for (int i = 0; i < 100; i++) {
+                double py = centerOfBlock.y + (serverWorld.random.nextDouble() * 5.0);
+                serverWorld.spawnParticles(ParticleTypes.END_ROD, centerOfBlock.x, py, centerOfBlock.z,
+                        2, 0.1, 1.0, 0.1, 0.05);
+                serverWorld.spawnParticles(ParticleTypes.DRAGON_BREATH, centerOfBlock.x, centerOfBlock.y + 0.5, centerOfBlock.z,
+                        5, 0.2, 0.2, 0.2, 0.02);
+            }
+
+            // 播放龙死亡的震撼音效，位置定在召唤方块
+            serverWorld.playSound(null, targetPos, SoundEvents.ENTITY_ENDER_DRAGON_DEATH, SoundCategory.HOSTILE, 2.0f, 1.0f);
+
+            // 2. 在方块正上方高处生成“落雷神剑”实体
+            // 假设你在 ModEntities 注册了 FALLEN_SWORD_ENTITY
+            FallenSwordEntity sword = new FallenSwordEntity(ModEntities.FALLEN_SWORD, serverWorld);
+
+            // 设置落点坐标：X, Z 对齐方块中心，Y 从高空 (例如 +40 或最高高度) 落下
+            double skyY = Math.min(serverWorld.getTopY() + 20, centerOfBlock.y + 40);
+            sword.refreshPositionAndAngles(centerOfBlock.x, skyY, centerOfBlock.z, 0, 0);
+
+            // 告诉剑实体它的终点位置（方块表面）
+            sword.setTargetY(centerOfBlock.y + 1.0);
+
+            serverWorld.spawnEntity(sword);
             serverWorld.syncWorldEvent(2006, deathPos, 0);
             // 1. 执行自定义死亡特效
             this.spawnEpicDeathEffects(serverWorld);

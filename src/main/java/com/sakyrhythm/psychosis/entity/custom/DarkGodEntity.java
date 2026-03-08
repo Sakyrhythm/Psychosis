@@ -1,5 +1,6 @@
 package com.sakyrhythm.psychosis.entity.custom;
 
+import com.sakyrhythm.psychosis.Psychosis;
 import com.sakyrhythm.psychosis.block.DarkPortalFrameBlock;
 import com.sakyrhythm.psychosis.block.ModBlocks;
 import com.sakyrhythm.psychosis.entity.ModEntities;
@@ -15,6 +16,7 @@ import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.entity.damage.DamageSources;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
@@ -24,6 +26,7 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -105,7 +108,7 @@ public class DarkGodEntity extends HostileEntity {
     private int stateTimer = 0;
     public final RegistryEntry<StatusEffect> darkEffectEntry;
     public final RegistryEntry<StatusEffect> vulnerableEffectEntry;
-
+    private RegistryEntry.Reference<DamageType> darkDamageEntry;
 
     // *** 阶段和攻击状态字段 ***
     private boolean isPhaseTwo = false;
@@ -245,28 +248,18 @@ public class DarkGodEntity extends HostileEntity {
         if (this.getWorld().isClient()) {
             return false;
         }
-
         // 粒子化状态下免疫大部分外部伤害
-        if (this.isParticlized() && !source.isOf(net.minecraft.entity.damage.DamageTypes.MAGIC)) {
+        if (this.isParticlized() && !source.isOf(Psychosis.DARK_DAMAGE)) {
             return false;
         }
         boolean isPlayerDamage = source.getAttacker() instanceof PlayerEntity;
 
-        if (this.getAttackState() == AttackState.IDLE && amount > 0 && isPlayerDamage) {
-
-            // 关键：存储攻击者作为潜在的IDLE目标（虽然这里不瞬移，但保持currentTarget惯例）
-            this.currentTarget = (PlayerEntity) source.getAttacker();
-
-            // 1. 设置状态和计时器
+        if (this.attackState == AttackState.IDLE && amount > 0 && source.getAttacker() instanceof PlayerEntity) {
             this.attackState = AttackState.HIT_PARTICLIZE;
             this.attackTimer = HIT_PARTICLIZE_DURATION; // 10 刻
-
-            // 2. 粒子化
             this.setParticlized(true);
-            this.setVelocity(Vec3d.ZERO); // 停止任何移动
-
-            // 3. Log
-            System.out.println("[Server] 受击触发粒子化闪烁 (IDLE) -> HIT_PARTICLIZE (" + DarkGodEntity.HIT_PARTICLIZE_DURATION + " 刻)");
+            this.setVelocity(Vec3d.ZERO);
+            System.out.println("[Server] 触发受击闪烁");
         }
 
         float healthBeforeDamage = this.getHealth();
@@ -303,7 +296,6 @@ public class DarkGodEntity extends HostileEntity {
             if (!isAppearing && this.summoningBlockPos != null) {
                 double distanceToBlock = this.getPos().distanceTo(Vec3d.ofCenter(this.summoningBlockPos));
                 if (distanceToBlock > 600.0) {
-                    System.out.println("[Server] Boss 距离方块太远 (>60格)，强制消失并重置。");
                     this.disappear(); // 这个方法内部已经包含了重置方块的逻辑
                     return;
                 }
@@ -312,11 +304,26 @@ public class DarkGodEntity extends HostileEntity {
             //    >> 仅在非出场状态下执行此检查
             if (!isAppearing) {
                 PlayerEntity closestPlayer = this.getWorld().getClosestPlayer(this, this.getAttributeValue(EntityAttributes.GENERIC_FOLLOW_RANGE));
-
                 if (closestPlayer == null) {
                     this.disappear();
                     return; // 立即返回，阻止执行本 tick 后续所有逻辑
                 }
+            }
+            switch (this.attackState) {
+                case HIT_PARTICLIZE:
+                    handleHitParticlizeTick(); // 在主循环里跑计时
+                    break;
+                case DASHING:
+                    this.setVelocity(this.dashDirection.multiply(NORMAL_MOVEMENT_SPEED * DASH_SPEED_MULTIPLIER));
+                    this.performDashDamage();
+                    break;
+                case IDLE:
+                default:
+                    // 攻击状态下速度清零
+                    if (this.getVelocity().lengthSquared() > 1.0E-4) {
+                        this.setVelocity(Vec3d.ZERO);
+                    }
+                    break;
             }
 
 
@@ -396,6 +403,20 @@ public class DarkGodEntity extends HostileEntity {
                     this.applyPhasePunishment();  // 二阶段永久惩罚
                 }
             }
+        }
+    }
+    private void handleHitParticlizeTick() {
+        this.attackTimer--;
+
+        // 保持粒子化和静止
+        this.setParticlized(true);
+        this.setVelocity(Vec3d.ZERO);
+
+        if (this.attackTimer <= 0) {
+            this.setParticlized(false);
+            this.attackState = AttackState.IDLE;
+            this.attackCooldownTimer = ATTACK_COOLDOWN; // 闪烁完进入冷却，防止立刻反击
+            System.out.println("[Server] 受击闪烁结束，恢复实体");
         }
     }
 
@@ -746,9 +767,6 @@ public class DarkGodEntity extends HostileEntity {
                     break;
                 case RECOVERY:
                     handleRecovery();
-                    break;
-                case HIT_PARTICLIZE: // ⭐ 确保这里调用了 handleHitParticlize()
-                    handleHitParticlize();
                     break;
                 case IDLE:
                 default:

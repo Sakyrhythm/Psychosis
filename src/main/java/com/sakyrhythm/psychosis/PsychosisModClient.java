@@ -84,6 +84,7 @@ public class PsychosisModClient implements ClientModInitializer {
             }
         });
         UmbrellaItem.registerModelPredicate();
+        EntityRendererRegistry.register(ModEntities.FALLEN_SWORD, FallenSwordEntityRenderer::new);
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_STEVE, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,false),64,64));
         EntityModelLayerRegistry.registerModelLayer(ModModelLayers.PLAYER_SLIM, ()->TexturedModelData.of(PlayerModelCopy.getTexturedModelData(Dilation.NONE,true),64,64));
         EntityRendererRegistry.register(ModEntities.PLAYER, PlayerRenderer::new);

@@ -160,6 +160,16 @@ public class ModEntities {
                             .makeFireImmune()
                             .build()
             );
+    public static final EntityType<FallenSwordEntity> FALLEN_SWORD = Registry.register(
+            Registries.ENTITY_TYPE,
+            Identifier.of(Psychosis.MOD_ID, "fallen_sword"),
+            EntityType.Builder.<FallenSwordEntity>create(FallenSwordEntity::new, SpawnGroup.MISC)
+                    // 尺寸建议：1格宽，1.5格高（稍微大一点方便玩家右键点击）
+                    .dimensions(1.0F, 1.5F)
+                    .maxTrackingRange(64) // 确保玩家在远距离也能看到光柱/特效
+                    .trackingTickInterval(1)
+                    .build()
+    );
     public static void registerAttributes() {
         DefaultAttributeContainer.Builder builder = DWitherEntity.createDegenerateWitherAttributes();
 

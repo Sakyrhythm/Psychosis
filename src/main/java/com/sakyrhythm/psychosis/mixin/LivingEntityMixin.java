@@ -53,6 +53,8 @@ public abstract class LivingEntityMixin implements ILivingEntity {
     @Shadow public abstract float getHealth();
     @Shadow public abstract void setHealth(float health);
     @Shadow @Nullable public abstract StatusEffectInstance getStatusEffect(RegistryEntry<StatusEffect> effect);
+    @Shadow
+    protected abstract float applyArmorToDamage(DamageSource source, float amount);
 
     @Unique
     private static RegistryEntry<StatusEffect> darkEffectEntryCache = null;
@@ -354,86 +356,79 @@ public abstract class LivingEntityMixin implements ILivingEntity {
                 .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of(Psychosis.MOD_ID, "divine")))
                 .orElse(null);
 
+        // --- DivineEffect 逻辑 (50% 基础减伤 + 80% 被动限伤) ---
         if (divineEffectEntry != null && livingEntity.hasStatusEffect(divineEffectEntry)) {
-            // ... (魔法伤害减免 80%)
-            if (darkDamageEntry == null) {
-                darkDamageEntry = livingEntity.getWorld().getRegistryManager()
-                        .get(RegistryKeys.DAMAGE_TYPE)
-                        .getEntry(Psychosis.DARK_DAMAGE)
-                        .orElse(null);
+
+            // 1. 基础减伤：特定类型降低 50%
+            boolean isMagic = source.isOf(net.minecraft.entity.damage.DamageTypes.MAGIC) ||
+                    source.isOf(net.minecraft.entity.damage.DamageTypes.INDIRECT_MAGIC);
+
+            boolean isDark = (darkDamageEntry != null && source.isOf(darkDamageEntry.registryKey()));
+            boolean isShadow = (shadowDamageEntry != null && source.isOf(shadowDamageEntry.registryKey()));
+
+            // 如果是其中一种，先进行 50% 基础减伤
+            if (isMagic || isDark || isShadow) {
+                currentDamage *= 0.50f;
             }
-            if (shadowDamageEntry == null) {
-                shadowDamageEntry = livingEntity.getWorld().getRegistryManager()
-                        .get(RegistryKeys.DAMAGE_TYPE)
-                        .getEntry(Psychosis.SHADOW_DAMAGE)
-                        .orElse(null);
-            }
+                // 3. 执行限伤：强制将伤害降至最大生命值的 80% (确保能留下一口气)
+            float currentTotalHealth = livingEntity.getHealth() + livingEntity.getAbsorptionAmount();
 
-            if ((darkDamageEntry != null && source.isOf(darkDamageEntry.registryKey())) ||
-                    (shadowDamageEntry != null && source.isOf(shadowDamageEntry.registryKey())) ||
-                    source.isOf(DamageTypes.MAGIC)) {
+            float postArmorDamage = ((LivingEntityMixin)(Object)this)
+                    .applyArmorToDamage(source, currentDamage);
+            float damageCap = livingEntity.getMaxHealth() * 0.80f;
+            float cappedDamage = Math.min(postArmorDamage, damageCap);
+            boolean originalFatal = postArmorDamage >= currentTotalHealth;
+            boolean cappedFatal = cappedDamage >= currentTotalHealth;
 
-                currentDamage *= (1.0f - 0.80f);
-            }
+            currentDamage = cappedDamage;
 
-            float damageBeforeCap = currentDamage;
-            float maxHealth = livingEntity.getMaxHealth();
-            float absorption = livingEntity.getAbsorptionAmount();
+            if (originalFatal && !cappedFatal) {
 
-            // 伤害上限：总生命基数的 90%
-            float damageCap = (maxHealth + absorption) * 0.90f;
+                    if (!livingEntity.getWorld().isClient) {
+                        ServerWorld serverWorld = (ServerWorld) livingEntity.getWorld();
+                        BlockPos playerPos = livingEntity.getBlockPos();
 
-            // 特效触发逻辑
-            float healthBeforeDamage = livingEntity.getHealth() + absorption;
-            boolean willDieWithoutCap = (healthBeforeDamage - damageBeforeCap <= EPSILON); // 使用容差
-            boolean survivesWithCap = (healthBeforeDamage - damageCap > EPSILON); // 使用容差
+                        LightningEntity lightning = new LightningEntity(EntityType.LIGHTNING_BOLT, serverWorld);
+                        lightning.setPos(playerPos.getX() + 0.5, playerPos.getY(), playerPos.getZ() + 0.5);
+                        lightning.setCosmetic(true);
+                        serverWorld.spawnEntity(lightning);
 
-            if (willDieWithoutCap && survivesWithCap) {
-                // ... (特效、音效、Title等代码保持不变) ...
-                if (!livingEntity.getWorld().isClient) {
-                    ServerWorld serverWorld = (ServerWorld) livingEntity.getWorld();
-                    BlockPos playerPos = livingEntity.getBlockPos();
+                        serverWorld.playSound(
+                                null, playerPos, SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER,
+                                SoundCategory.WEATHER, 0.2F, 0.8F + serverWorld.random.nextFloat() * 0.2F
+                        );
 
-                    LightningEntity lightning = new LightningEntity(EntityType.LIGHTNING_BOLT, serverWorld);
-                    lightning.setPos(playerPos.getX() + 0.5, playerPos.getY(), playerPos.getZ() + 0.5);
-                    lightning.setCosmetic(true);
-                    serverWorld.spawnEntity(lightning);
+                        serverWorld.playSound(
+                                null, playerPos, SoundEvents.BLOCK_GLASS_BREAK,
+                                SoundCategory.PLAYERS, 4.0F, 0.9F + serverWorld.random.nextFloat() * 0.2F
+                        );
+                    }
 
-                    serverWorld.playSound(
-                            null, playerPos, net.minecraft.sound.SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER,
-                            net.minecraft.sound.SoundCategory.WEATHER, 0.2F, 0.8F + serverWorld.random.nextFloat() * 0.2F
-                    );
-                    serverWorld.playSound(
-                            null, livingEntity.getBlockPos(), net.minecraft.sound.SoundEvents.BLOCK_GLASS_BREAK,
-                            net.minecraft.sound.SoundCategory.PLAYERS, 4.0F, 0.9F + serverWorld.random.nextFloat() * 0.2F
-                    );
+                    if (livingEntity instanceof ServerPlayerEntity serverPlayer) {
+                        Text titleText = Text.translatable("title.psychosis.divine_cap_title").formatted(Formatting.RED);
+                        Text subtitleText = Text.translatable("title.psychosis.divine_cap_subtitle").formatted(Formatting.GOLD);
+
+                        serverPlayer.networkHandler.sendPacket(new TitleFadeS2CPacket(10, 40, 10));
+                        serverPlayer.networkHandler.sendPacket(new SubtitleS2CPacket(subtitleText));
+                        serverPlayer.networkHandler.sendPacket(new TitleS2CPacket(titleText));
+                    }
+
+                    livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 60, 0, false, false, false));
+                    livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 2, false, false, false));
+                    livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 600, 0, false, false, true));
+
+                    RegistryEntry<StatusEffect> darkEffectEntry = livingEntity.getWorld().getRegistryManager()
+                            .get(RegistryKeys.STATUS_EFFECT)
+                            .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "dark")))
+                            .orElse(null);
+
+                    if (darkEffectEntry != null) {
+                        livingEntity.removeStatusEffect(darkEffectEntry);
+                    }
+
+                    livingEntity.sendMessage(Text.translatable("limit_damage_save").formatted(Formatting.GOLD));
                 }
-
-                if (livingEntity instanceof ServerPlayerEntity serverPlayer) {
-                    Text titleText = Text.translatable("title.psychosis.divine_cap_title").formatted(Formatting.RED);
-                    Text subtitleText = Text.translatable("title.psychosis.divine_cap_subtitle").formatted(Formatting.GOLD);
-
-                    serverPlayer.networkHandler.sendPacket(new TitleFadeS2CPacket(10, 40, 10));
-                    serverPlayer.networkHandler.sendPacket(new SubtitleS2CPacket(subtitleText));
-                    serverPlayer.networkHandler.sendPacket(new TitleS2CPacket(titleText));
-                }
-
-                livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 60, 0, false, false, false));
-                livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 2, false, false, false));
-                livingEntity.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 600, 0, false, false, true));
-
-                RegistryEntry<StatusEffect> darkEffectEntryCache = livingEntity.getWorld().getRegistryManager()
-                        .get(RegistryKeys.STATUS_EFFECT)
-                        .getEntry(RegistryKey.of(RegistryKeys.STATUS_EFFECT, Identifier.of("psychosis", "dark")))
-                        .orElse(null);
-                livingEntity.removeStatusEffect(darkEffectEntryCache);
-
-                livingEntity.sendMessage(Text.translatable("limit_damage_save").formatted(Formatting.GOLD));
             }
-
-            // 最终将伤害限制在 damageCap
-            currentDamage = Math.min(damageBeforeCap, damageCap);
-        }
 
         if (livingEntity instanceof GoddessEntity goddess) {
 
