@@ -1,0 +1,17 @@
+{
+  "type": "psychosis:the_ocean_type",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "layers": [
+        {"block": "minecraft:water", "height": 70},
+        {"block": "minecraft:air", "height": 100},
+        {"block": "minecraft:water", "height": 60}
+      ],
+      "biome": "psychosis:the_ocean_biome",
+      "structures": {
+        "structures": {}
+      }
+    }
+  }
+}

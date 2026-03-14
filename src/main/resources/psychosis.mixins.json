@@ -5,6 +5,7 @@
   "mixins": [
     "BrewingRecipeRegistryMixin",
     "ChunkGeneratorMixin",
+    "DisableFluidFlowMixin",
     "GoddessEntityClientMixin",
     "LivingEntityMixin",
     "PlayerInventoryMixin",

@@ -14,11 +14,13 @@ import com.sakyrhythm.psychosis.entity.effect.DarkEffect;
 import com.sakyrhythm.psychosis.entity.effect.DivineEffect;
 import com.sakyrhythm.psychosis.entity.effect.FrenzyEffect;
 import com.sakyrhythm.psychosis.entity.effect.VulnerableEffect;
+import com.sakyrhythm.psychosis.event.PlayerHeightHandler;
 import com.sakyrhythm.psychosis.interfaces.IPlayerEntity;
 import com.sakyrhythm.psychosis.item.*;
 import com.sakyrhythm.psychosis.networking.LeftClickC2SPayload;
 import com.sakyrhythm.psychosis.networking.ModNetworking;
 import com.sakyrhythm.psychosis.world.DarkBlockTracker;
+import com.sakyrhythm.psychosis.world.WaterColumnManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -28,6 +30,8 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -40,7 +44,9 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.item.BlockItem;
+import net.minecraft.item.BoatItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.CustomPayload;
@@ -57,13 +63,11 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Util;
+import net.minecraft.util.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.gen.structure.Structure;
 import org.jetbrains.annotations.NotNull;
@@ -132,7 +136,8 @@ public class Psychosis implements ModInitializer {
 			this.centerChunk = centerChunk;
 		}
 	}
-
+	// 在 Psychosis 类顶部添加
+	public static final Identifier THE_OCEAN_ID = Identifier.of(MOD_ID, "the_ocean");
 	@Override
 	public void onInitialize() {
 		ModConfig.load();
@@ -227,7 +232,130 @@ public class Psychosis implements ModInitializer {
 				LOGGER.error("❌ FAILURE: Dark Damage Type ({}) is MISSING from the registry. Data pack issue suspected!", Psychosis.DARK_DAMAGE.getValue());
 			}
 		});
+		ServerTickEvents.END_WORLD_TICK.register(world -> {
+			if (world instanceof ServerWorld serverWorld && isTheOcean(serverWorld)) {
+				WaterColumnManager.tick(serverWorld);
+			}
+		});
+		// 在 onInitialize() 方法中添加
 
+// 在 onInitialize() 方法中替换原来的生物移除代码
+		ServerTickEvents.END_WORLD_TICK.register(world -> {
+			if (world instanceof ServerWorld serverWorld && isTheOcean(serverWorld)) {
+				// 安全的实体移除方式
+				List<Entity> toRemove = new ArrayList<>();
+
+				for (Entity entity : serverWorld.iterateEntities()) {
+					String entityType = entity.getType().toString();
+					if (entityType.contains("drowned") ||
+							entityType.contains("squid") ||
+							entityType.contains("guardian") ||
+							entityType.contains("turtle") ||
+							entityType.contains("dolphin") ||
+							entityType.contains("axolotl") ||
+							entityType.contains("fish") ||
+							entityType.contains("cod") ||
+							entityType.contains("salmon") ||
+							entityType.contains("puffer") ||
+							entityType.contains("tropical")) {
+						toRemove.add(entity);
+					}
+				}
+				for (Entity entity : toRemove) {
+					entity.remove(Entity.RemovalReason.DISCARDED);
+				}
+			}
+		});
+		UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+			if (world.isClient() || !isTheOcean(world)) {
+				return ActionResult.PASS;
+			}
+			return ActionResult.FAIL;
+		});
+
+		AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
+			if (world.isClient() || !isTheOcean(world)) {
+				return ActionResult.PASS;
+			}
+			return ActionResult.FAIL;
+		});
+		java.util.function.Predicate<net.minecraft.world.World> isTheOcean = (world) ->
+				world.getRegistryKey().getValue().equals(THE_OCEAN_ID);
+		UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+			if (world.isClient() || !isTheOcean.test(world)) {
+				return ActionResult.PASS;
+			}
+
+			ItemStack stack = player.getStackInHand(hand);
+			if (stack.getItem() instanceof BlockItem) {
+				return ActionResult.FAIL;
+			}
+			return ActionResult.PASS;
+		});
+
+// 2. 禁止使用船
+		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+			if (world.isClient() || !isTheOcean.test(world)) {
+				return ActionResult.PASS;
+			}
+
+			if (entity instanceof BoatEntity) {
+				return ActionResult.FAIL;
+			}
+			return ActionResult.PASS;
+		});
+
+// 3. 禁止船物品
+		UseItemCallback.EVENT.register((player, world, hand) -> {
+			if (world.isClient() || !isTheOcean.test(world)) {
+				return TypedActionResult.pass(player.getStackInHand(hand));
+			}
+
+			ItemStack stack = player.getStackInHand(hand);
+			if (stack.getItem() instanceof BoatItem) {
+				return TypedActionResult.fail(stack);
+			}
+			return TypedActionResult.pass(stack);
+		});
+
+// 4. 随机水滴效果（服务器端控制，发送到客户端）
+		ServerTickEvents.END_WORLD_TICK.register(world -> {
+			if (!(world instanceof ServerWorld serverWorld) || !isTheOcean.test(serverWorld)) {
+				return;
+			}
+
+			// 每20 tick（1秒）随机选择一些位置产生水滴
+			if (serverWorld.getRandom().nextInt(20) == 0) { // 5%几率每秒触发
+				// 获取所有在线玩家
+				for (ServerPlayerEntity player : serverWorld.getPlayers()) {
+					// 在玩家周围随机位置产生水滴
+					BlockPos playerPos = player.getBlockPos();
+
+					// 随机选择10-20个位置
+					int particleCount = 5 + serverWorld.getRandom().nextInt(10);
+
+					for (int i = 0; i < particleCount; i++) {
+						// 在玩家周围15格范围内随机选择位置
+						double offsetX = (serverWorld.getRandom().nextDouble() - 0.5) * 30;
+						double offsetY = serverWorld.getRandom().nextDouble() * 10 + 5; // 从上方5-15格落下
+						double offsetZ = (serverWorld.getRandom().nextDouble() - 0.5) * 30;
+
+						double x = playerPos.getX() + offsetX;
+						double y = playerPos.getY() + offsetY;
+						double z = playerPos.getZ() + offsetZ;
+
+						// 发送水滴粒子
+						serverWorld.spawnParticles(
+								ParticleTypes.FALLING_WATER,  // 水滴粒子
+								x, y, z,
+								3,                            // 数量
+								0.1, 0.1, 0.1,                // 偏移
+								0.1                           // 速度
+						);
+					}
+				}
+			}
+		});
 		// ************************************************************
 		// 方块交互事件：追踪 DARK_BLOCK 放置
 		// ************************************************************
@@ -280,9 +408,8 @@ public class Psychosis implements ModInitializer {
 			}
 
 			DarkBlockTracker tracker = DarkBlockTracker.get(serverWorld);
-			WorldChunk worldChunk = (WorldChunk) chunk;
 
-			ChunkPos chunkPos = worldChunk.getPos();
+            ChunkPos chunkPos = ((WorldChunk) chunk).getPos();
 			int minX = chunkPos.getStartX();
 			int minZ = chunkPos.getStartZ();
 			int minY = world.getBottomY();
@@ -291,7 +418,7 @@ public class Psychosis implements ModInitializer {
 			int addedCount = 0;
 
 			for (BlockPos pos : BlockPos.iterate(minX, minY, minZ, minX + 15, maxY - 1, minZ + 15)) {
-				BlockState state = worldChunk.getBlockState(pos);
+				BlockState state = ((WorldChunk) chunk).getBlockState(pos);
 
 				if (state.isOf(ModBlocks.DARK_BLOCK) && !tracker.getAllPositions().contains(pos)) {
 					tracker.addPosition(pos.toImmutable());
@@ -303,6 +430,7 @@ public class Psychosis implements ModInitializer {
 				tracker.markDirty();
 			}
 		});
+		PlayerHeightHandler.register();
 
 		// ************************************************************
 		// 命令注册
@@ -351,6 +479,35 @@ public class Psychosis implements ModInitializer {
 									})
 							)
 					)
+					// 在 Psychosis.java 的命令注册部分找到 .then(literal("status")...) 后面添加：
+
+					.then(literal("test")
+							.requires(source -> source.hasPermissionLevel(2)) // 仅管理员可用
+							.then(literal("pillar")
+									.executes(context -> {
+										ServerPlayerEntity player = context.getSource().getPlayer();
+										if (player != null && isTheOcean(player.getServerWorld())) {
+											WaterColumnManager.spawnIcePillar(player.getServerWorld(), player);
+											context.getSource().sendFeedback(() -> Text.literal("§b[测试] §f已在附近生成冰柱"), false);
+											return 1;
+										}
+										context.getSource().sendError(Text.literal("必须在 The Ocean 维度执行"));
+										return 0;
+									})
+							)
+							.then(literal("spear")
+									.executes(context -> {
+										ServerPlayerEntity player = context.getSource().getPlayer();
+										if (player != null && isTheOcean(player.getServerWorld())) {
+											WaterColumnManager.spawnIceSpear(player.getServerWorld(), player);
+											context.getSource().sendFeedback(() -> Text.literal("§b[测试] §f已生成瞄准你的冰矛"), false);
+											return 1;
+										}
+										context.getSource().sendError(Text.literal("必须在 The Ocean 维度执行"));
+										return 0;
+									})
+							)
+					)
 					.then(literal("config")
 							.requires(source -> true)
 							.then(literal("rainSlowness")
@@ -395,6 +552,10 @@ public class Psychosis implements ModInitializer {
 					)
 			);
 		});
+	}
+	// 在 Psychosis 类中添加这个辅助方法（放在文件末尾，其他方法之后）
+	public static boolean isTheOcean(World world) {
+		return world.getRegistryKey().getValue().equals(THE_OCEAN_ID);
 	}
 
 	// ************************************************************
@@ -500,6 +661,7 @@ public class Psychosis implements ModInitializer {
 			), false);
 			return distance;
 		}
+
 	}
 
 	// ************************************************************
